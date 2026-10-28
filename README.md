@@ -1,6 +1,6 @@
 # novel-engine
 
-单用户小说创作核心，提供离线 CLI、配置校验、FakeProvider 和带历史快照的 SQLite 稿件工作区。工程使用 ESM、TypeScript strict、Commander、Zod、better-sqlite3 与 Vitest。
+单用户小说创作核心，提供规划、候选生成、审稿、人工批准和导出，支持历史快照、来源记忆、局部修订与运行恢复。工程使用 TypeScript strict、ESM、SQLite 和 AI SDK，通过 CLI 操作。
 
 ## 环境与安装
 
@@ -40,7 +40,7 @@ npm run novel -- doctor --offline --json
 
 `maxOutputTokens` 必须是正的安全整数。模型配置还支持 `contextWindowTokens`（默认 16384）与 `timeoutMs`（默认 30000）。多余字段、无效 JSON 或显式指定但不存在的文件都会失败，不会静默回退。错误输出不包含配置值或原始 JSON。
 
-真实模型配置示例见 [compatible.example.json](fixtures/config/compatible.example.json)，使用 HTTPS 的 OpenAI 兼容 Chat Completions 接口，密钥只通过 `apiKeyEnv` 指定的环境变量读取。示例中的地址与模型名应按实际供应商配置。离线 doctor 只检查配置，不测试服务连通。
+真实模型配置示例见 [compatible.example.json](fixtures/config/compatible.example.json)，使用 HTTPS 的 OpenAI 兼容 Chat Completions 接口，密钥只通过 `apiKeyEnv` 指定的环境变量读取。端点不接受内嵌账号、密码、查询参数或片段，避免凭据被写入运行记录。示例中的地址与模型名应按实际供应商配置。离线 doctor 只检查配置，不测试服务连通。
 
 ## 模型探测与运行记录
 
@@ -53,7 +53,7 @@ npm run novel -- --project ./books/demo run cancel <run-id>
 
 第一条命令使用内置假模型；第二条在配置对应密钥后会调用真实 API，产生供应商用量。普通测试使用模拟 HTTP 响应验证适配器，不连接真实供应商。
 
-每次请求发送前持久化预算预留，原始响应先保存再解析；SDK 自动重试关闭，输出修复与重试最多两次尝试且共享运行预算。缺失 usage 或价格时费用保持未知；可选 `prices` 包含 `inputPerMillion`、`outputPerMillion`（USD／百万 token）与 `version`，估算不是最终账单。超时或断线的请求记录为 unknown，不自动重发，也不会释放可能已消费的预算。取消后的结果不能继续提交。
+每次请求发送前持久化预算预留，模型原始文本、返回的模型 ID、响应 ID、完成原因与 usage 先保存再解析。结构化步骤由网关附加 JSON Schema 并校验，不假定兼容端点都支持原生结构化响应。SDK 自动重试关闭，同一输入的已知失败至多两次尝试；unknown 的显式重试也共享原运行预算。缺失 usage 或价格时费用保持未知；可选 `prices` 包含 `inputPerMillion`、`outputPerMillion`（USD／百万 token）与 `version`，估算不是最终账单。超时或断线不自动重发，也不会释放可能已消费的预算。取消后的结果不能继续提交，恢复也不能把截断响应当作完整结果。
 
 FakeProvider 可用 `responsesFile` 指定 JSON 字符串数组，路径相对于配置文件；未指定时只提供一次探测响应。模型原始输出与提示词保存在本地工作区，分享运行记录前应检查其中的稿件内容。
 
@@ -111,7 +111,7 @@ workflow write 执行生成、检查、审稿和事实提取，完成后退出�
 
 批准需要绑定同一正文版本、内容哈希和项目基线的有效审稿与提取结果。确定冲突阻止批准；待核查和风格意见需要作者说明理由。事实提取结果保留为待确认信息。引用使用正文版本、非空文本行区块 b1、b2 等及原句；可选 start/end 为全文 UTF-16 偏移，重复原句必须给出准确位置。
 
-resume 复用保存的步骤和产物，输入版本改变时拒绝继续；unknown 请求需显式 `--retry-unknown`，且仍受原预算约束。运行中断后可通过 run list 找到 ID。当前恢复入口面向 plan、draft、write、review 和 revise 创作运行。
+resume 复用保存的步骤和产物，输入版本改变时拒绝继续；unknown 请求需显式 `--retry-unknown`，且仍受原预算约束。运行中断后可通过 run list 找到 ID。恢复入口支持规划、候选、写作、审稿、修订、影响分析、记忆重建和模型探测；部分选择运行会返回待批准产物。已完成的运行不能通过 cancel 撤回，正文撤回使用独立命令。
 
 ## 记忆、来源与上下文
 
@@ -149,6 +149,18 @@ preview 返回替换前后正文与修改位置。select 是本地动作，先�
 `chapter show <id>` 返回区块与 UTF-16 位置。`lock add --chapter <id> --block <block-id>` 锁定区块，`lock list` 查看，`lock remove <lock-id>` 由作者解锁。整章替换不能绕过锁定；局部修改会保持锁定文字并更新位置。
 
 undo 通过创建新正文版本恢复选择前的内容；若相关章节已有后续修改或新锁定阻止恢复，则拒绝覆盖。也可使用 `chapter restore <id> --revision <old-revision-id> --expected-version <version>` 显式恢复同章历史正文。
+
+## 只读重放与效果记录
+
+```bash
+npm run novel -- --project ./books/demo run replay <run-id> --offline
+npm run novel -- evaluation status
+npm run novel -- evaluation compare --file ./measurements.json
+```
+
+replay 在 SQLite 只读事务中重新核对请求输入摘要、原始响应解析、引用和部分选择的实际正文，不重发模型请求，也不修改正式稿。返回 originalStatus、逐项检查、未确认请求和 databaseChanges；重放核对成功不代表原运行成功或创作质量通过。存在 unknown 或校验失败时退出码为 1。
+
+效果比较输入遵循 [EvaluationSchema](src/application/evaluation.ts)。每条记录包含组别、任务与重复次数、模型／来源／参数标识、人工编辑时间、总耗时、标注问题的真阳性／误报／漏报、未批准锁定修改数和费用。两组任务必须成对、同模型和同资料，每个任务至少三次独立运行；比较中位修稿时间、召回、误报和费用。合成数据、未获人工确认的标签、未冻结协议及不完整费用都不能产生通过结论。
 
 ## 模型契约与离线响应
 

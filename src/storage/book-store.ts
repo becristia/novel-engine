@@ -32,6 +32,7 @@ export class BookStore extends WorkspaceDatabase {
   }
 
   insertRevision(chapterId: string, content: string, parentId: string | null = null, runId: string | null = null): Revision {
+    if (parentId !== null && this.revision(parentId).chapterId !== chapterId) throw new Error('正文父版本必须属于同一章节。');
     const revision = { id: randomUUID(), chapterId, parentId, content, contentHash: hash(content), runId };
     this.db.prepare('INSERT INTO revisions VALUES (?, ?, ?, ?, ?, ?)').run(revision.id, chapterId, parentId, content, revision.contentHash, runId);
     return revision;

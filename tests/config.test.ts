@@ -54,4 +54,11 @@ describe('configuration boundary', () => {
     expect(error).toBeInstanceOf(ConfigurationError);
     expect(String(error)).not.toContain('test-secret');
   });
+
+  it.each(['https://user:test-secret@example.test/v1', 'https://example.test/v1?key=test-secret'])('rejects credentials embedded in endpoint URLs without disclosure', async (baseURL) => {
+    const file = join(tempDirectory, 'credential-url.json');
+    await writeFile(file, JSON.stringify({ schemaVersion: 1, model: { provider: 'openai-compatible', modelId: 'test-model', baseURL, apiKeyEnv: 'NOVEL_TEST_KEY', maxOutputTokens: 128 } }));
+    const error = await loadConfig(file).catch((value: unknown) => value);
+    expect(error).toBeInstanceOf(ConfigurationError); expect(String(error)).not.toContain('test-secret');
+  });
 });

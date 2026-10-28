@@ -1,13 +1,11 @@
 import { Command } from 'commander';
-import { z } from 'zod';
 import { positiveInteger } from '../domain/workspace.js';
 import { loadConfig } from '../llm/config.js';
 import { createTransport } from '../llm/factory.js';
-import { TrackedGateway } from '../llm/tracked-gateway.js';
 import { RunStore } from '../storage/run-store.js';
 import { withWorkspace } from './workspace-commands.js';
 import type { CliIO } from './program.js';
-import { withRunLease } from '../workflows/lease.js';
+import { ProbeWorkflow } from '../workflows/probe.js';
 
 export function registerRunCommands(program: Command, io: CliIO): void {
   const show = (value: unknown) => io.stdout(`${JSON.stringify(value, null, 2)}\n`);
@@ -18,22 +16,7 @@ export function registerRunCommands(program: Command, io: CliIO): void {
     .action(async (options: { maxRequests: number; maxTokens: number }, command: Command) => {
       const loaded = await loadConfig(command.optsWithGlobals<{ config?: string }>().config);
       const transport = await createTransport(loaded);
-      await withWorkspace(command, async book => {
-        const runs = new RunStore(book);
-        const run = runs.create('probe', {}, loaded.config, { maxRequests: options.maxRequests, maxTokens: options.maxTokens });
-        show({ runId: run.id, provider: loaded.config.model.provider });
-        await withRunLease(runs, run.id, async lease => {
-        try {
-          const gateway = new TrackedGateway(runs, run.id, 'probe:v1', transport, false, lease.assert);
-          const result = await gateway.generateObject({ prompt: '返回一个对象，ok 为 true。', maxOutputTokens: 128, schema: z.strictObject({ ok: z.literal(true) }) });
-          runs.status(run.id, 'succeeded');
-          show(result);
-        } catch (error) {
-          lease.fail('probe-failed');
-          throw error;
-        }
-        });
-      });
+      show(await withWorkspace(command, book => new ProbeWorkflow(book, loaded.config, transport, { maxRequests: options.maxRequests, maxTokens: options.maxTokens }, loaded.source).start()));
     });
   const run = program.command('run').description('查看和取消持久化运行。');
   run.command('inspect <id>').action(async (id: string, _options: unknown, command: Command) => {

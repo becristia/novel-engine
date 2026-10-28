@@ -87,6 +87,7 @@ export function moveLocks(book: BookStore, state: BookState, chapterId: string, 
 export function acceptSelection(book: BookStore, proposal: Proposal, state: BookState, reason: string) {
   const selected = SelectionSchema.parse(proposal.payload); const proposals = new ProposalStore(book);
   const source = proposals.get(selected.sourceProposalId); const payload = PatchPayloadSchema.parse(source.payload);
+  new RunStore(book).assertRunnable(source.runId);
   if (source.status !== 'pending' || source.baseVersion !== proposal.baseVersion) throw new Error('原修改提案已过期，需要重新分析。');
   const expected = previewGroups(book, payload, selected.groupIds, state);
   if (expected.length !== selected.drafts.length) throw new Error('候选集合与所选修改组不一致。');

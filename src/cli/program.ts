@@ -8,6 +8,7 @@ import { registerCreationCommands } from './creation-commands.js';
 import { registerCompletionCommands } from './completion-commands.js';
 import { registerMemoryCommands } from './memory-commands.js';
 import { registerPatchCommands } from './patch-commands.js';
+import { registerVerificationCommands } from './verification-commands.js';
 
 export interface CliIO {
   stdout: (text: string) => void;
@@ -24,7 +25,7 @@ export async function runCli(args: string[], io: CliIO = defaultIO): Promise<num
   let exitCode = 0;
   program
     .name('novel-engine')
-    .description(formatHumanText('小说创作核心的离线工具。'))
+    .description(formatHumanText('小说创作核心：规划、写作、审稿、修订与运行检查。'))
     .version('0.0.0', '-V, --version', formatHumanText('显示版本号。'))
     .exitOverride()
     .enablePositionalOptions()
@@ -63,6 +64,7 @@ export async function runCli(args: string[], io: CliIO = defaultIO): Promise<num
   registerCompletionCommands(program, io);
   registerMemoryCommands(program, io);
   registerPatchCommands(program, io);
+  registerVerificationCommands(program, io);
 
   try {
     await program.parseAsync(args, { from: 'user' });

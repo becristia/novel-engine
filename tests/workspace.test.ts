@@ -75,6 +75,12 @@ describe('versioned workspace', () => {
     expect(() => store.db.exec('DELETE FROM snapshots')).toThrow('immutable');
   });
 
+  it('does not attach a revision to another chapter as its parent', async () => {
+    await service.importFile('fixtures/novels/harbor-light.md', true);
+    const [first, second] = store.snapshot().state.chapters;
+    expect(() => store.insertRevision(first!.id, '正文。', second!.revisionId)).toThrow('同一章节');
+  });
+
   it('does not overwrite existing export files', async () => {
     const target = join(directory, 'export.md');
     await writeFile(target, '原有稿件');

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 import { AppConfigSchema } from '../domain/model-config.js';
 import type { AppConfig } from '../domain/model-config.js';
-import type { ModelUsage } from '../llm/model-gateway.js';
+import type { ModelUsage, ModelResult } from '../llm/model-gateway.js';
 import { BookStore } from './book-store.js';
 
 export const BudgetSchema = z.strictObject({ maxRequests: z.number().int().positive(), maxTokens: z.number().int().positive() });
@@ -15,6 +15,7 @@ export interface Attempt {
   id: string; runId: string; step: string; inputHash: string; prompt: string; maxOutputTokens: number; reservedTokens: number;
   status: 'inflight' | 'received' | 'succeeded' | 'failed' | 'unknown'; raw: string | null; usage: string | null;
   estimatedCost: number | null; priceVersion: string | null; error: string | null;
+  responseModelId: string | null; providerResponseId: string | null; finishReason: string | null; startedAt: string; finishedAt: string | null;
 }
 
 export class RunStore {
@@ -49,7 +50,7 @@ export class RunStore {
   }
 
   attempts(runId: string, step?: string): Attempt[] {
-    return this.book.db.prepare(`SELECT id, run_id AS runId, step, input_hash AS inputHash, prompt, max_output_tokens AS maxOutputTokens, reserved_tokens AS reservedTokens, status, raw, usage, estimated_cost AS estimatedCost, price_version AS priceVersion, error FROM attempts WHERE run_id = ? ${step === undefined ? '' : 'AND step = ?'} ORDER BY rowid`)
+    return this.book.db.prepare(`SELECT id, run_id AS runId, step, input_hash AS inputHash, prompt, max_output_tokens AS maxOutputTokens, reserved_tokens AS reservedTokens, status, raw, usage, estimated_cost AS estimatedCost, price_version AS priceVersion, error, response_model_id AS responseModelId, provider_response_id AS providerResponseId, finish_reason AS finishReason, started_at AS startedAt, finished_at AS finishedAt FROM attempts WHERE run_id = ? ${step === undefined ? '' : 'AND step = ?'} ORDER BY rowid`)
       .all(...(step === undefined ? [runId] : [runId, step])) as Attempt[];
   }
 
@@ -68,7 +69,7 @@ export class RunStore {
   }
 
   cancel(id: string): void {
-    this.get(id);
+    if (this.get(id).status === 'succeeded') throw new Error('运行已经完成，取消不能撤回已完成的操作。');
     this.book.db.transaction(() => {
       this.book.db.prepare("UPDATE runs SET status = 'cancelled', cancelled = 1 WHERE id = ?").run(id);
       this.book.db.prepare("UPDATE attempts SET status = 'unknown', error = 'cancelled-before-result' WHERE run_id = ? AND status = 'inflight'").run(id);
@@ -98,12 +99,12 @@ export class RunStore {
     }).immediate();
   }
 
-  receive(attempt: Attempt, raw: string, usage: ModelUsage | null): void {
+  receive(attempt: Attempt, raw: string, usage: ModelUsage | null, metadata?: Pick<ModelResult<string>, 'modelId' | 'providerResponseId' | 'finishReason'>): void {
     const prices = this.get(attempt.runId).config.model.prices;
     const validUsage = usage && Number.isFinite(usage.inputTokens) && usage.inputTokens >= 0 && Number.isFinite(usage.outputTokens) && usage.outputTokens >= 0 ? usage : null;
     const cost = prices && validUsage ? (validUsage.inputTokens * prices.inputPerMillion + validUsage.outputTokens * prices.outputPerMillion) / 1_000_000 : null;
-    this.book.db.prepare("UPDATE attempts SET status = 'received', raw = ?, usage = ?, estimated_cost = ?, price_version = ?, finished_at = ? WHERE id = ? AND status = 'inflight'")
-      .run(raw, validUsage ? JSON.stringify(validUsage) : null, cost, prices?.version ?? null, new Date().toISOString(), attempt.id);
+    this.book.db.prepare("UPDATE attempts SET status = 'received', raw = ?, usage = ?, estimated_cost = ?, price_version = ?, finished_at = ?, response_model_id = ?, provider_response_id = ?, finish_reason = ? WHERE id = ? AND status = 'inflight'")
+      .run(raw, validUsage ? JSON.stringify(validUsage) : null, cost, prices?.version ?? null, new Date().toISOString(), metadata?.modelId ?? null, metadata?.providerResponseId ?? null, metadata?.finishReason ?? null, attempt.id);
   }
 
   finishAttempt(id: string, status: Attempt['status'], error: string | null = null): void {

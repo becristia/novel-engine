@@ -1,5 +1,6 @@
 import { setTimeout as delay } from 'node:timers/promises';
 import type { ModelGateway, ModelRequest, ModelResult, StructuredModelRequest } from './model-gateway.js';
+import { RequestFailure } from './request-failure.js';
 
 export class ModelOutputError extends Error {
   constructor(readonly kind: 'invalid-json' | 'invalid-schema' | 'empty-response') {
@@ -26,7 +27,7 @@ export class FakeProvider implements ModelGateway {
     }
     const response = this.responses[this.cursor];
     if (response === undefined) {
-      throw new Error('FakeProvider 的固定响应已用完。');
+      throw new RequestFailure('known', false, 'fake-responses-exhausted', 'FakeProvider 的固定响应已用完。');
     }
     this.cursor += 1;
     // A real async boundary lets offline tests exercise in-flight cancellation.

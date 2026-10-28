@@ -28,31 +28,43 @@ const migrations = [
    CREATE TRIGGER immutable_memory_payload BEFORE UPDATE OF kind, revision_id, content_hash, payload, parent_id ON memory_entries BEGIN SELECT RAISE(ABORT, 'immutable memory payload'); END;`,
   `ALTER TABLE approvals ADD COLUMN details TEXT NOT NULL DEFAULT '{}';
    CREATE TABLE selection_keys (request_id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES proposals(id));`,
+  `ALTER TABLE attempts ADD COLUMN response_model_id TEXT;
+   ALTER TABLE attempts ADD COLUMN provider_response_id TEXT;
+   ALTER TABLE attempts ADD COLUMN finish_reason TEXT;`,
 ];
+
+export function migrateDatabase(db: Database.Database, scripts: readonly string[]): void {
+  const version = db.pragma('user_version', { simple: true }) as number;
+  if (version > scripts.length) throw new Error('数据库版本高于当前程序，停止打开以保护原数据。');
+  db.transaction(() => {
+    for (let index = version; index < scripts.length; index += 1) {
+      db.exec(scripts[index]!); db.pragma(`user_version = ${index + 1}`);
+    }
+  }).immediate();
+}
 
 export class WorkspaceDatabase {
   readonly db: Database.Database;
   readonly directory: string;
 
-  constructor(directory: string, create = false) {
+  constructor(directory: string, create = false, readOnly = false) {
     this.directory = resolve(directory);
     const file = join(this.directory, 'novel.db');
     if (create && existsSync(file)) throw new Error('工作区已经存在，不能覆盖。');
     if (!create && !existsSync(file)) throw new Error('工作区不存在，请先执行 init。');
     if (create) mkdirSync(this.directory, { recursive: true });
-    this.db = new Database(file);
+    this.db = new Database(file, { readonly: readOnly, fileMustExist: !create });
     try {
       const version = this.db.pragma('user_version', { simple: true }) as number;
       if (version > migrations.length) throw new Error('数据库版本高于当前程序，停止打开以保护原数据。');
       if (!create && version === 0) throw new Error('文件不是有效的小说工作区。');
+      if (readOnly) {
+        if (version !== migrations.length) throw new Error('只读重放需要匹配当前 schema 的工作区，请先正常打开完成升级。');
+        return;
+      }
       this.db.pragma('foreign_keys = ON');
       this.db.pragma('busy_timeout = 5000');
-      this.db.transaction(() => {
-        for (let index = version; index < migrations.length; index += 1) {
-          this.db.exec(migrations[index]!);
-          this.db.pragma(`user_version = ${index + 1}`);
-        }
-      }).immediate();
+      migrateDatabase(this.db, migrations);
       this.db.pragma('journal_mode = WAL');
     } catch (error) {
       this.db.close();

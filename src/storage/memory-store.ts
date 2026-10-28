@@ -18,7 +18,7 @@ export class MemoryStore {
     return this.book.db.prepare('SELECT id, kind, revision_id AS revisionId, content_hash AS contentHash, payload, status, confirmed, origin, parent_id AS parentId FROM memory_entries ORDER BY rowid').all() as MemoryEntry[];
   }
   private get(id: string): MemoryEntry {
-    const item = this.entries().find(entry => entry.id === id);
+    const item = this.book.db.prepare('SELECT id, kind, revision_id AS revisionId, content_hash AS contentHash, payload, status, confirmed, origin, parent_id AS parentId FROM memory_entries WHERE id = ?').get(id) as MemoryEntry | undefined;
     if (!item) throw new Error('记忆条目不存在。');
     return item;
   }
@@ -53,7 +53,7 @@ export class MemoryStore {
   }
 
   summary(revisionId: string): string | undefined {
-    const row = this.entries().find(entry => entry.kind === 'summary' && entry.revisionId === revisionId && entry.status === 'fresh' && entry.contentHash === this.book.revision(revisionId).contentHash);
+    const row = this.book.db.prepare("SELECT payload FROM memory_entries WHERE kind = 'summary' AND revision_id = ? AND status = 'fresh' AND content_hash = ? ORDER BY rowid DESC LIMIT 1").get(revisionId, this.book.revision(revisionId).contentHash) as { payload: string } | undefined;
     return row ? SummarySchema.parse(JSON.parse(row.payload)).summary : undefined;
   }
 

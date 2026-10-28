@@ -8,6 +8,7 @@ import { SelectionSchema } from '../src/domain/patch.js';
 import { BookStore } from '../src/storage/book-store.js';
 import { FakeProvider } from '../src/llm/fake-provider.js';
 import { ImpactWorkflow } from '../src/workflows/impact.js';
+import { RunStore } from '../src/storage/run-store.js';
 import { CreationWorkflow } from '../src/workflows/creation.js';
 import { PatchService, normalizeImpact } from '../src/proposals/patches.js';
 
@@ -100,6 +101,13 @@ describe('partial revision and undo', () => {
     const first = book.snapshot().state.chapters[0]!; patch.lock(first.id, 'b2');
     const source = await analyze();
     expect(() => patch.select(source.proposal.id, ['g1'])).toThrow('锁定范围');
+  });
+
+  it('does not approve a selection whose source analysis was cancelled', async () => {
+    const source = await analyze(); const selected = patch.select(source.proposal.id, ['g1']); await reviewSelection(selected.id);
+    new RunStore(book).cancel(source.runId);
+    expect(() => approvals.approve(selected.id)).toThrow('已取消');
+    expect(new CommitService(book).exportText()).not.toContain('远处的港口');
   });
 
   it('does not undo over later author edits and revalidates remaining work against the new baseline', async () => {

@@ -38,11 +38,16 @@ export class TrackedGateway implements ModelGateway {
       return parsed.data;
     };
     const saved = previous.find(attempt => attempt.status === 'received' || attempt.status === 'succeeded');
+    if (saved && (saved.finishReason === 'length' || saved.finishReason === 'content-filter')) {
+      this.runs.finishAttempt(saved.id, 'failed', 'incomplete-output');
+      this.runs.status(this.runId, 'failed', 'incomplete-output');
+      throw new Error('已保存的模型输出被截断或过滤，不能在恢复时作为完整结果。');
+    }
     if (saved?.raw !== null && saved?.raw !== undefined) {
       try {
         const value = parse(saved.raw);
         this.runs.finishAttempt(saved.id, 'succeeded');
-        return { value, modelId: run.config.model.modelId, usage: saved.usage ? JSON.parse(saved.usage) : null };
+        return { value, modelId: saved.responseModelId ?? run.config.model.modelId, ...(saved.providerResponseId ? { providerResponseId: saved.providerResponseId } : {}), ...(saved.finishReason ? { finishReason: saved.finishReason } : {}), usage: saved.usage ? JSON.parse(saved.usage) : null };
       } catch {
         this.runs.finishAttempt(saved.id, 'failed', 'invalid-output');
       }
@@ -70,7 +75,7 @@ export class TrackedGateway implements ModelGateway {
         throw new Error(known ? `模型请求被拒绝：${code}。` : '模型请求结果不明，已保留预算和 unknown 记录，未自动重发。');
       }
       this.assertOwnership();
-      this.runs.receive(attempt, response.value, response.usage);
+      this.runs.receive(attempt, response.value, response.usage, response);
       if (response.finishReason === 'length' || response.finishReason === 'content-filter') {
         this.runs.finishAttempt(attempt.id, 'failed', 'incomplete-output');
         this.runs.status(this.runId, 'failed', 'incomplete-output');

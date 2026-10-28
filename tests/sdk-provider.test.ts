@@ -23,6 +23,7 @@ describe('AI SDK compatible adapter', () => {
     }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     const result = await new SdkProvider(config()).generateText({ prompt: '开始。', maxOutputTokens: 128 });
     expect(result.value).toBe('模型正文。');
+    expect(result.providerResponseId).toBe('response-1'); expect(result.finishReason).toBe('stop');
     expect(result.usage).toEqual({ inputTokens: 12, outputTokens: 6 });
     expect(fetch).toHaveBeenCalledTimes(1);
     const body = JSON.parse(fetch.mock.calls[0]![1]!.body as string);

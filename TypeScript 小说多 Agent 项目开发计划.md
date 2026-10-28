@@ -277,7 +277,7 @@ M0 的 doctor 未指定配置文件时检查内置 FakeProvider 配置；显式�
 npm run novel -- init ./books/demo --title "试验小说"
 npm run novel -- --project ./books/demo import ./examples/manuscript.md --preview
 npm run novel -- --project ./books/demo import ./examples/manuscript.md --apply
-npm run novel -- models probe --profile default
+npm run novel -- --project ./books/demo --config ./novel.config.json models probe
 npm run novel -- --project ./books/demo plan --brief ./examples/brief.md --chapters 3
 npm run novel -- --project ./books/demo proposal list
 npm run novel -- --project ./books/demo proposal show <proposal-id>
@@ -298,7 +298,7 @@ npm run novel -- --project ./books/demo run replay <run-id> --offline
 npm run novel -- --project ./books/demo export --format markdown --out ./exports/demo.md
 ```
 
-chapter draft 在 M3 只生成候选；M4 后可由 workflow write 调度完整写作与审稿流程。正文候选也通过 proposal show 和 proposal approve 查看与接受。resume 继续未完成步骤；offline replay 在隔离数据或只读模式下重放已保存结果，不调用模型、不改正式稿。修改旧输入后重跑创建新的 run，保留原 run 的输入和结果。
+chapter draft 在 M3 只生成候选；M4 后可由 workflow write 调度完整写作与审稿流程。正文候选也通过 proposal show 和 proposal approve 查看与接受。单配置文件直接指定模型，不增加尚无实际需求的 profile 注册表。resume 继续未完成步骤；offline replay 在隔离数据或只读模式下重放已保存结果，不调用模型、不改正式稿。修改旧输入后重跑创建新的 run，保留原 run 的输入和结果。
 
 恢复前再次核对原 run 的输入基线。正文或计划已经变化时，旧 run 标记 stale，保存的结果仍可查看；继续生成需要创建新的 run 并重建上下文。
 

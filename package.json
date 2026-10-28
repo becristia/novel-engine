@@ -2,7 +2,7 @@
   "name": "novel-engine",
   "version": "0.0.0",
   "private": true,
-  "description": "单用户小说创作核心的离线工程基础",
+  "description": "单用户小说创作核心：可追溯的规划、写作、审稿与修订",
   "license": "UNLICENSED",
   "type": "module",
   "packageManager": "npm@11.19.1",

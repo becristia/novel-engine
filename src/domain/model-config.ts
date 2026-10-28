@@ -16,7 +16,10 @@ const CompatibleConfigSchema = z.strictObject({
   ...common,
   provider: z.literal('openai-compatible'),
   modelId: z.string().min(1),
-  baseURL: z.url().refine(value => new URL(value).protocol === 'https:', 'HTTPS required'),
+  baseURL: z.url().refine(value => {
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash;
+  }, 'HTTPS endpoint without credentials or query required'),
   apiKeyEnv: z.string().regex(/^[A-Z][A-Z0-9_]*$/u),
 });
 export const ModelConfigSchema = z.discriminatedUnion('provider', [FakeConfigSchema, CompatibleConfigSchema]);

@@ -2,15 +2,10 @@ import { generateText, APICallError } from 'ai';
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { AppConfig } from '../domain/model-config.js';
 import type { ModelGateway, ModelRequest, ModelResult } from './model-gateway.js';
+import { RequestFailure } from './request-failure.js';
+export { RequestFailure } from './request-failure.js';
 
 export type TextTransport = Pick<ModelGateway, 'generateText'>;
-export class RequestFailure extends Error {
-  constructor(readonly outcome: 'known' | 'unknown', readonly retryable: boolean, readonly code: string) {
-    super(`模型请求失败：${code}。`);
-    this.name = 'RequestFailure';
-  }
-}
-
 export class SdkProvider implements TextTransport {
   private readonly model;
   constructor(config: AppConfig['model']) {
@@ -25,7 +20,7 @@ export class SdkProvider implements TextTransport {
       const result = await generateText({ model: this.model, prompt: request.prompt, maxOutputTokens: request.maxOutputTokens, maxRetries: 0, ...(request.signal ? { abortSignal: request.signal } : {}) });
       const inputTokens = result.usage.inputTokens;
       const outputTokens = result.usage.outputTokens;
-      return { value: result.text, modelId: result.response.modelId, finishReason: result.finishReason, usage: inputTokens === undefined || outputTokens === undefined ? null : { inputTokens, outputTokens } };
+      return { value: result.text, modelId: result.response.modelId, finishReason: result.finishReason, ...(result.response.id ? { providerResponseId: result.response.id } : {}), usage: inputTokens === undefined || outputTokens === undefined ? null : { inputTokens, outputTokens } };
     } catch (error) {
       if (APICallError.isInstance(error) && error.statusCode !== undefined) {
         const status = error.statusCode;

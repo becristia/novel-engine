@@ -9,6 +9,7 @@ import type { CliIO } from './program.js';
 import { MemoryWorkflow } from '../workflows/memory.js';
 import { ImpactWorkflow } from '../workflows/impact.js';
 import { ProposalStore } from '../storage/proposal-store.js';
+import { ProbeWorkflow } from '../workflows/probe.js';
 
 export function registerCompletionCommands(program: Command, io: CliIO): void {
   const show = (value: unknown) => io.stdout(`${JSON.stringify(value, null, 2)}\n`);
@@ -46,6 +47,7 @@ export function registerCompletionCommands(program: Command, io: CliIO): void {
         const transport = await createTransport({ config: stored.config, source: input.configSource ?? 'builtin' }, new RunStore(book).attempts(id).length);
         if (stored.kind === 'memory') return new MemoryWorkflow(book, stored.config, transport, stored.budget, input.configSource ?? 'builtin').resume(id, Boolean(options.retryUnknown));
         if (stored.kind === 'impact') return new ImpactWorkflow(book, stored.config, transport, stored.budget, input.configSource ?? 'builtin').resume(id, Boolean(options.retryUnknown));
+        if (stored.kind === 'probe') return new ProbeWorkflow(book, stored.config, transport, stored.budget, input.configSource ?? 'builtin').resume(id, Boolean(options.retryUnknown));
         return new CreationWorkflow(book, stored.config, transport, stored.budget, input.configSource ?? 'builtin').resume(id, Boolean(options.retryUnknown));
       }));
     });

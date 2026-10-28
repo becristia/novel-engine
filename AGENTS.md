@@ -16,6 +16,7 @@
 - `src/context/`、`src/review/`、`src/proposals/`：上下文与记忆、证据检查、版本绑定的局部修改。
 - `prompts/`：版本化提示词；`fixtures/evaluation/`：固定评测材料与标注状态。
 - `tests/`：契约、配置、取消和 CLI 行为测试。
+- `tests/support/`：只用于测试的子进程故障驱动，可终止自身进程；不得接入真实供应商或作为产品入口。
 - `fixtures/`：不含真实密钥的固定配置、响应与小说样例元数据。
 - `.tmp/<task-slug>/`：本次任务临时数据；`dist/`：可重建的编译结果。
 
