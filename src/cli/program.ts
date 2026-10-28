@@ -2,6 +2,7 @@ import { Command, CommanderError } from 'commander';
 import { ConfigurationError } from '../llm/config.js';
 import { runDoctor } from './doctor.js';
 import { formatField, formatHumanText } from './format.js';
+import { registerWorkspaceCommands } from './workspace-commands.js';
 
 export interface CliIO {
   stdout: (text: string) => void;
@@ -21,6 +22,7 @@ export async function runCli(args: string[], io: CliIO = defaultIO): Promise<num
     .description(formatHumanText('小说创作核心的离线工具。'))
     .version('0.0.0', '-V, --version', formatHumanText('显示版本号。'))
     .exitOverride()
+    .enablePositionalOptions()
     .configureOutput({ writeOut: io.stdout, writeErr: io.stderr })
     .helpOption('-h, --help', formatHumanText('显示帮助信息。'))
     .addHelpCommand('help [command]', formatHumanText('查看命令帮助。'))
@@ -49,6 +51,8 @@ export async function runCli(args: string[], io: CliIO = defaultIO): Promise<num
         ? '离线检查通过，未调用模型。'
         : '运行环境不匹配，需要 Node.js 24.22.1 或更高的 24.x 版本。')}\n`);
     });
+
+  registerWorkspaceCommands(program, io);
 
   try {
     await program.parseAsync(args, { from: 'user' });

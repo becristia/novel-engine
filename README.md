@@ -1,6 +1,6 @@
 # novel-engine
 
-单用户小说创作核心的 TypeScript 工程基础，提供离线 CLI、配置校验和固定响应的 FakeProvider。工程使用 ESM、TypeScript strict、Commander、Zod 与 Vitest。
+单用户小说创作核心，提供离线 CLI、配置校验、FakeProvider 和带历史快照的 SQLite 稿件工作区。工程使用 ESM、TypeScript strict、Commander、Zod、better-sqlite3 与 Vitest。
 
 ## 环境与安装
 
@@ -45,6 +45,22 @@ npm run novel -- doctor --offline --json
 ```bash
 npm run novel -- doctor --offline --config ./fixtures/config/invalid.json
 ```
+
+## 稿件工作区
+
+```bash
+npm run novel -- init ./books/demo --title "港口旧灯"
+npm run novel -- --project ./books/demo import ./fixtures/novels/harbor-light.md --preview
+npm run novel -- --project ./books/demo import ./fixtures/novels/harbor-light.md --apply
+npm run novel -- --project ./books/demo chapter list
+npm run novel -- --project ./books/demo export --version 1 --format markdown --out ./exports/version-1.md
+```
+
+导入支持 UTF-8 和带 BOM 的 UTF-16，以 Markdown 二级标题或独立的“第 N 章／回／节”行拆章。导入保留原始字节，正文统一换行为 LF；重复导入相同内容不会新增章节，同一路径内容变化时要求显式替换章节。
+
+`chapter replace <id> --file <file> --expected-version <version>` 替换作者正文；`chapter insert --title <title> --file <file> --position <n> --expected-version <version>` 插章；`chapter reorder <ids...> --expected-version <version>` 重排。章节 ID 从 list 返回，顺序变化不会改变 ID。历史项目快照固定正文与顺序，过期版本写入会失败。
+
+`chapter show <id> --version <version>` 查看历史正文；导出支持 markdown 和 txt（去除二级标题标记），目标文件必须不存在，避免覆盖已有稿件。工作区权威数据位于 novel.db，导出文件的修改不会自动回写。
 
 ## 模型契约与离线响应
 
