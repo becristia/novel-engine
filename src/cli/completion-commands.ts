@@ -6,6 +6,7 @@ import { CreationWorkflow } from '../workflows/creation.js';
 import { RunStore } from '../storage/run-store.js';
 import { withWorkspace } from './workspace-commands.js';
 import type { CliIO } from './program.js';
+import { MemoryWorkflow } from '../workflows/memory.js';
 
 export function registerCompletionCommands(program: Command, io: CliIO): void {
   const show = (value: unknown) => io.stdout(`${JSON.stringify(value, null, 2)}\n`);
@@ -37,6 +38,7 @@ export function registerCompletionCommands(program: Command, io: CliIO): void {
         const stored = new RunStore(book).get(id);
         const input = stored.input as { configSource?: string };
         const transport = await createTransport({ config: stored.config, source: input.configSource ?? 'builtin' }, new RunStore(book).attempts(id).length);
+        if (stored.kind === 'memory') return new MemoryWorkflow(book, stored.config, transport, stored.budget, input.configSource ?? 'builtin').resume(id, Boolean(options.retryUnknown));
         return new CreationWorkflow(book, stored.config, transport, stored.budget, input.configSource ?? 'builtin').resume(id, Boolean(options.retryUnknown));
       }));
     });

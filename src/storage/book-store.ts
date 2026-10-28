@@ -46,12 +46,26 @@ export class BookStore extends WorkspaceDatabase {
       }
       const current = this.snapshot();
       if (current.version !== expectedVersion) throw new Error('项目版本冲突，请基于最新版本重新操作。');
+      const before = structuredClone(current.state);
       mutate(current.state);
       const state = BookStateSchema.parse(current.state);
       if (new Set(state.chapters.map(chapter => chapter.id)).size !== state.chapters.length) throw new Error('章节身份重复。');
       for (const chapter of state.chapters) {
         if (this.revision(chapter.revisionId).chapterId !== chapter.id) throw new Error('章节与正文版本不匹配。');
       }
+      const appendOnly = before.chapters.every((chapter, index) => state.chapters[index]?.id === chapter.id && state.chapters[index]?.revisionId === chapter.revisionId);
+      if (!appendOnly || JSON.stringify(before.constraints) !== JSON.stringify(state.constraints)) {
+        this.db.prepare("UPDATE memory_entries SET status = 'stale' WHERE status = 'fresh'").run();
+        this.db.prepare("UPDATE memory_sources SET status = 'stale' WHERE status = 'fresh'").run();
+        state.confirmedFactIds = [];
+      }
+      for (const chapter of state.chapters) {
+        this.db.prepare("UPDATE memory_entries SET status = 'fresh' WHERE revision_id = ? AND status = 'pending'").run(chapter.revisionId);
+        this.db.prepare("UPDATE memory_sources SET status = 'fresh' WHERE revision_id = ? AND status = 'pending'").run(chapter.revisionId);
+        const confirmed = this.db.prepare("SELECT id FROM memory_entries WHERE revision_id = ? AND kind = 'fact' AND status = 'fresh' AND confirmed = 1").all(chapter.revisionId) as { id: string }[];
+        state.confirmedFactIds.push(...confirmed.map(item => item.id));
+      }
+      state.confirmedFactIds = [...new Set(state.confirmedFactIds)];
       const next = current.version + 1;
       this.db.prepare('INSERT INTO snapshots VALUES (?, ?, ?)').run(next, JSON.stringify(state), new Date().toISOString());
       const changed = this.db.prepare('UPDATE project SET version = ? WHERE version = ?').run(next, expectedVersion);

@@ -7,6 +7,8 @@ export const BookStateSchema = z.strictObject({
   chapters: z.array(ChapterRefSchema),
   constraints: z.array(z.string()),
   plans: z.record(z.string(), ApprovedPlanSchema).default({}),
+  confirmedFactIds: z.array(z.string()).default([]),
+  aliases: z.record(z.string(), z.array(z.string())).default({}),
 });
 export type BookState = z.infer<typeof BookStateSchema>;
 export interface Snapshot { version: number; state: BookState }

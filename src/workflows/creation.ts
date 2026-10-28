@@ -7,6 +7,7 @@ import type { AppConfig } from '../domain/model-config.js';
 import { BookStore } from '../storage/book-store.js';
 import { ProposalStore } from '../storage/proposal-store.js';
 import { ReviewStore } from '../storage/review-store.js';
+import { MemoryStore } from '../storage/memory-store.js';
 import { RunStore } from '../storage/run-store.js';
 import type { Budget, Run } from '../storage/run-store.js';
 import { buildContext, ContextSchema } from '../context/builder.js';
@@ -156,7 +157,7 @@ export class CreationWorkflow {
     const proposal = this.proposals.get(artifact.proposalId);
     const payload = DraftPayloadSchema.parse(proposal.payload);
     if (proposal.status !== 'pending' || proposal.baseVersion !== run.baseVersion || payload.contentHash !== revision.contentHash || payload.planRevisionId !== context.plan.revisionId) throw new Error('候选、计划或项目版本不一致。');
-    const sourceIds = new Set([...this.book.snapshot(run.baseVersion).state.chapters.map(chapter => chapter.revisionId), revision.id]);
+    const sourceIds = new Set([...context.sources.filter(source => !['plan', 'constraint'].includes(source.kind)).map(source => source.revisionId), revision.id]);
     const sources = [...sourceIds].map(id => { const source = this.book.revision(id); return { chapterId: source.chapterId, revisionId: id, contentHash: source.contentHash, blocks: blocks(source.content) }; });
     const reviewKey = `review:${revision.id}`;
     let review: Review;
@@ -178,7 +179,7 @@ export class CreationWorkflow {
       try {
         const response = await gateway(extractionKey).generateObject({ prompt: `${prompt('extractor-v1')}\n${JSON.stringify(sources.find(source => source.revisionId === revision.id))}`, maxOutputTokens: run.config.model.maxOutputTokens, schema: ExtractionSchema });
         const extraction = validateExtraction(this.book, response.value, revision.id);
-        this.book.db.transaction(() => { lease.assert(); const id = this.reports.save('extractions', revision.id, run.baseVersion, run.id, 'extracted', extraction); this.runs.saveArtifact(run.id, extractionKey, { id }); }).immediate();
+        this.book.db.transaction(() => { lease.assert(); const id = this.reports.save('extractions', revision.id, run.baseVersion, run.id, 'extracted', extraction); new MemoryStore(this.book).ingest(revision.id, extraction); this.runs.saveArtifact(run.id, extractionKey, { id }); }).immediate();
       } catch (error) {
         lease.assert(); this.reports.save('extractions', revision.id, run.baseVersion, run.id, 'failed', { code: 'extraction-unavailable' }); throw error;
       }

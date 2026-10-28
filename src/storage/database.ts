@@ -22,6 +22,10 @@ const migrations = [
    CREATE TABLE reviews (id TEXT PRIMARY KEY, revision_id TEXT NOT NULL REFERENCES revisions(id), content_hash TEXT NOT NULL, base_version INTEGER NOT NULL, run_id TEXT NOT NULL REFERENCES runs(id), status TEXT NOT NULL, payload TEXT NOT NULL);
    CREATE TABLE extractions (id TEXT PRIMARY KEY, revision_id TEXT NOT NULL REFERENCES revisions(id), content_hash TEXT NOT NULL, base_version INTEGER NOT NULL, run_id TEXT NOT NULL REFERENCES runs(id), status TEXT NOT NULL, payload TEXT NOT NULL);
    CREATE TABLE approvals (request_id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES proposals(id), revision_id TEXT, review_id TEXT, reason TEXT NOT NULL, created_at TEXT NOT NULL);`,
+  `CREATE TABLE memory_sources (revision_id TEXT PRIMARY KEY REFERENCES revisions(id), content_hash TEXT NOT NULL, status TEXT NOT NULL);
+   CREATE TABLE memory_entries (id TEXT PRIMARY KEY, kind TEXT NOT NULL, revision_id TEXT NOT NULL REFERENCES revisions(id), content_hash TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL, confirmed INTEGER NOT NULL DEFAULT 0, origin TEXT NOT NULL, parent_id TEXT REFERENCES memory_entries(id));
+   CREATE INDEX memory_revision ON memory_entries(revision_id, status);
+   CREATE TRIGGER immutable_memory_payload BEFORE UPDATE OF kind, revision_id, content_hash, payload, parent_id ON memory_entries BEGIN SELECT RAISE(ABORT, 'immutable memory payload'); END;`,
 ];
 
 export class WorkspaceDatabase {

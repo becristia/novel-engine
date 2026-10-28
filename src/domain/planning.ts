@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const PlanContentSchema = z.strictObject({
   title: z.string().min(1), goal: z.string().min(1), characters: z.array(z.string()),
   constraints: z.array(z.string()), events: z.array(z.string()), targetLength: z.number().int().positive(),
+  viewpointCharacter: z.string().nullable().optional(),
 });
 export const PlannerOutputSchema = z.strictObject({ chapters: z.array(PlanContentSchema).min(1).max(20) });
 export const ApprovedPlanSchema = PlanContentSchema.extend({ chapterId: z.string(), revisionId: z.string(), ordinal: z.number().int().positive() });

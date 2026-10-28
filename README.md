@@ -113,6 +113,24 @@ workflow write 执行生成、检查、审稿和事实提取，完成后退出�
 
 resume 复用保存的步骤和产物，输入版本改变时拒绝继续；unknown 请求需显式 `--retry-unknown`，且仍受原预算约束。运行中断后可通过 run list 找到 ID。当前恢复入口面向 plan、draft、write、review 和 revise 创作运行。
 
+## 记忆、来源与上下文
+
+```bash
+npm run novel -- --project ./books/demo memory status
+npm run novel -- --project ./books/demo memory confirm <fact-id> <fact-id>
+npm run novel -- --project ./books/demo memory correct <fact-id> --file ./corrected-fact.json
+npm run novel -- --project ./books/demo memory alias --entity lin-zhou --names 林舟 小林
+npm run novel -- --project ./books/demo --config ./novel.config.json memory rebuild
+npm run novel -- --project ./books/demo context show --chapter 4
+npm run novel -- --project ./books/demo constraints set --file ./constraints.json --expected-version <version>
+```
+
+事实默认未确认。确认候选事实不会改变项目基线，候选批准时同时提升为正式来源；确认或纠正正式稿事实会产生新的项目版本，已有候选可能因此过期。纠正保留旧条目、来源和作者决定。constraints 文件是作者独立声明的字符串数组。
+
+新增章节保留来源未变的旧章记忆，只重建新增或失效来源；替换旧正文、重排或改变作者约束会在正文事务里使旧派生记忆失效。失效摘要和事实不参与上下文，预算允许时回退正式原文。rebuild 涉及模型请求，默认最多 16 次请求、128000 token，可单独指定 `--chapter <id>`。
+
+上下文保留硬约束和当前计划，优先最近正式正文，再按人物、别名和关键词选择已确认事实及旧章来源；每项来源记录版本、选择理由和估算，省略项也记录原因。事实、角色误信、未来计划分别分组。计划可设置 viewpointCharacter；仅有明确角色和获知时间证据的信息进入该视角的已知组，缺少证据保留未知。章序只用于叙述披露范围，不推断故事发生时间。单值关系在同一明确时间出现多个值时显示待核对冲突，多件物品会并存。
+
 ## 模型契约与离线响应
 
 [ModelGateway](src/llm/model-gateway.ts) 定义文本、结构化结果和 AbortSignal 接口。[FakeProvider](src/llm/fake-provider.ts) 按调用顺序返回预置字符串；结构化生成会解析 JSON 并通过调用方的 Zod schema 校验。
