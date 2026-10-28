@@ -1,5 +1,14 @@
 import type { AppConfig } from '../domain/model-config.js';
 import { BookStore } from '../storage/book-store.js';
+import { z } from 'zod';
+import { ApprovedPlanSchema } from '../domain/planning.js';
+
+export const ContextSchema = z.strictObject({
+  projectVersion: z.number().int().nonnegative(), plan: ApprovedPlanSchema,
+  sources: z.array(z.strictObject({ kind: z.enum(['constraint', 'plan', 'chapter']), id: z.string(), revisionId: z.string(), text: z.string(), reason: z.string(), estimatedTokens: z.number().int().nonnegative() })),
+  estimatedTokens: z.number().int().nonnegative(),
+});
+export type ContextSnapshot = z.infer<typeof ContextSchema>;
 
 export interface ContextSource { kind: 'constraint' | 'plan' | 'chapter'; id: string; revisionId: string; text: string; reason: string; estimatedTokens: number }
 export function buildContext(book: BookStore, chapter: number | string, config: AppConfig, version = book.project().version) {

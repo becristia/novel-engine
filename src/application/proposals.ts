@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { PlanContentSchema, PlanPayloadSchema } from '../domain/planning.js';
+import { PlanContentSchema, PlanPayloadSchema, DraftPayloadSchema } from '../domain/planning.js';
 import { hash } from '../domain/workspace.js';
 import { BookStore } from '../storage/book-store.js';
 import { ProposalStore } from '../storage/proposal-store.js';
 import { RunStore } from '../storage/run-store.js';
+import { ReviewStore } from '../storage/review-store.js';
+import { validateReview, validateExtraction } from '../review/evidence.js';
 
 export class ProposalService {
   readonly proposals: ProposalStore;
@@ -18,10 +20,28 @@ export class ProposalService {
       const current = this.proposals.get(id);
       if (current.status !== 'pending') throw new Error('提案当前不能批准。');
       new RunStore(this.book).assertRunnable(current.runId);
-      if (current.kind !== 'plan') throw new Error('正文候选必须完成绑定版本的检查与审稿后才能批准。');
-      const payload = PlanPayloadSchema.parse(current.payload);
-      for (const plan of payload.plans) state.plans[plan.chapterId] = plan;
+      let approvedRevision: string | null = null;
+      let approvedReview: string | null = null;
+      if (current.kind === 'plan') {
+        const payload = PlanPayloadSchema.parse(current.payload);
+        for (const plan of payload.plans) state.plans[plan.chapterId] = plan;
+      } else if (current.kind === 'draft') {
+        const payload = DraftPayloadSchema.parse(current.payload);
+        const revision = this.book.revision(payload.revisionId);
+        const plan = state.plans[payload.chapterId];
+        if (!plan || plan.revisionId !== payload.planRevisionId || revision.chapterId !== payload.chapterId || revision.contentHash !== payload.contentHash) throw new Error('候选正文、计划或内容哈希不匹配。');
+        const reports = new ReviewStore(this.book).approvedReports(revision.id, current.baseVersion);
+        const allowed = new Set([...state.chapters.map(chapter => chapter.revisionId), revision.id]);
+        validateReview(this.book, reports.review, allowed); validateExtraction(this.book, reports.extraction, revision.id);
+        if (reports.review.issues.some(issue => issue.kind === 'conflict')) throw new Error('存在尚未解决的确定冲突，请修订并重新审稿。');
+        if (reports.review.issues.length && !reason.trim()) throw new Error('存在待核查或风格意见，请用 --reason 记录作者处理理由。');
+        const existing = state.chapters.find(chapter => chapter.id === payload.chapterId);
+        if (existing) existing.revisionId = revision.id;
+        else state.chapters.push({ id: payload.chapterId, title: plan.title, revisionId: revision.id });
+        approvedRevision = revision.id; approvedReview = reports.reviewId;
+      } else throw new Error('该提案类型需要先形成可审稿的候选。');
       this.proposals.status(id, 'approved');
+      this.book.db.prepare('INSERT INTO approvals VALUES (?, ?, ?, ?, ?, ?)').run(requestId, id, approvedRevision, approvedReview, reason, new Date().toISOString());
       new RunStore(this.book).status(current.runId, 'succeeded');
     });
   }

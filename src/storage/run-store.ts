@@ -20,6 +20,15 @@ export interface Attempt {
 export class RunStore {
   constructor(readonly book: BookStore) {}
 
+  artifact(id: string, name: string): unknown {
+    const row = this.book.db.prepare('SELECT value FROM run_artifacts WHERE run_id = ? AND name = ?').get(id, name) as { value: string } | undefined;
+    return row ? JSON.parse(row.value) : undefined;
+  }
+
+  saveArtifact(id: string, name: string, value: unknown): void {
+    this.book.db.prepare('INSERT INTO run_artifacts VALUES (?, ?, ?)').run(id, name, JSON.stringify(value));
+  }
+
   create(kind: string, input: unknown, config: AppConfig, budget: Budget): Run {
     const id = randomUUID();
     const parsedConfig = AppConfigSchema.parse(config);
@@ -56,7 +65,10 @@ export class RunStore {
 
   cancel(id: string): void {
     this.get(id);
-    this.book.db.prepare("UPDATE runs SET status = 'cancelled', cancelled = 1 WHERE id = ?").run(id);
+    this.book.db.transaction(() => {
+      this.book.db.prepare("UPDATE runs SET status = 'cancelled', cancelled = 1 WHERE id = ?").run(id);
+      this.book.db.prepare("UPDATE attempts SET status = 'unknown', error = 'cancelled-before-result' WHERE run_id = ? AND status = 'inflight'").run(id);
+    }).immediate();
   }
 
   recoverUnknown(id: string): void {

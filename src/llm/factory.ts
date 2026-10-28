@@ -6,14 +6,14 @@ import { FakeProvider } from './fake-provider.js';
 import { SdkProvider } from './sdk-provider.js';
 import type { TextTransport } from './sdk-provider.js';
 
-export async function createTransport(loaded: LoadedConfig): Promise<TextTransport> {
+export async function createTransport(loaded: LoadedConfig, consumedResponses = 0): Promise<TextTransport> {
   const config = loaded.config.model;
   if (config.provider === 'openai-compatible') return new SdkProvider(config);
-  if (!config.responsesFile) return new FakeProvider(['{"ok":true}']);
+  if (!config.responsesFile) return new FakeProvider(['{"ok":true}'].slice(consumedResponses));
   const base = loaded.source === 'builtin' ? process.cwd() : dirname(loaded.source);
   try {
     const responses = z.array(z.string()).parse(JSON.parse(await readFile(resolve(base, config.responsesFile), 'utf8')));
-    return new FakeProvider(responses);
+    return new FakeProvider(responses.slice(consumedResponses));
   } catch {
     throw new Error('固定响应文件无法读取或不是字符串数组。');
   }

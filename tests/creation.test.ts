@@ -46,7 +46,7 @@ describe('planning and candidate isolation', () => {
     expect(() => proposals.approve(first.proposal.id)).toThrow('审稿');
     proposals.reject(first.proposal.id);
     const next = await new CreationWorkflow(book, config, new FakeProvider(['新的候选正文。']), budget).draft(1);
-    expect(next.revision.content).toContain('新的候选');
+    expect(next.revision!.content).toContain('新的候选');
     expect(new CommitService(book).exportText()).toBe('');
     expect(JSON.stringify(buildContext(book, 1, config))).not.toContain('拒绝的候选正文');
     expect(() => buildContext(book, 2, config)).toThrow('前序章节');

@@ -5,6 +5,7 @@ import { formatField, formatHumanText } from './format.js';
 import { registerWorkspaceCommands } from './workspace-commands.js';
 import { registerRunCommands } from './run-commands.js';
 import { registerCreationCommands } from './creation-commands.js';
+import { registerCompletionCommands } from './completion-commands.js';
 
 export interface CliIO {
   stdout: (text: string) => void;
@@ -57,6 +58,7 @@ export async function runCli(args: string[], io: CliIO = defaultIO): Promise<num
   registerWorkspaceCommands(program, io);
   registerRunCommands(program, io);
   registerCreationCommands(program, io);
+  registerCompletionCommands(program, io);
 
   try {
     await program.parseAsync(args, { from: 'user' });

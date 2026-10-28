@@ -96,6 +96,23 @@ npm run novel -- --project ./books/demo proposal reject <proposal-id>
 
 Writer 只使用已批准的计划和正式正文；候选与拒绝稿不会进入导出或后续上下文。dry-run 只读取固定来源，不创建运行或调用模型。每部作品同时只允许一个模型写任务；运行检查输入版本与写入权，旧进程的迟到响应不能保存为新候选。请求数默认上限为 8，运行 token 预算默认 64000，可用 `--max-requests` 与 `--max-tokens` 调整。
 
+## 写作、审稿与恢复
+
+```bash
+npm run novel -- --project ./books/demo --config ./novel.config.json workflow write --chapter 1
+npm run novel -- --project ./books/demo --config ./novel.config.json chapter review --revision <revision-id>
+npm run novel -- --project ./books/demo --config ./novel.config.json chapter revise --revision <revision-id> --instruction "明确章末转折。"
+npm run novel -- --project ./books/demo proposal approve <proposal-id> --reason "保留审稿指出的慢节奏作为铺垫。"
+npm run novel -- --project ./books/demo run list
+npm run novel -- --project ./books/demo run resume <run-id>
+```
+
+workflow write 执行生成、检查、审稿和事实提取，完成后退出并等待批准，不自动写入正式稿。`--revise-once` 允许根据审稿结果最多自动修订一轮，并为新正文重新审稿。chapter revise 同样生成新的候选及报告，原稿保留。
+
+批准需要绑定同一正文版本、内容哈希和项目基线的有效审稿与提取结果。确定冲突阻止批准；待核查和风格意见需要作者说明理由。事实提取结果保留为待确认信息。引用使用正文版本、非空文本行区块 b1、b2 等及原句；可选 start/end 为全文 UTF-16 偏移，重复原句必须给出准确位置。
+
+resume 复用保存的步骤和产物，输入版本改变时拒绝继续；unknown 请求需显式 `--retry-unknown`，且仍受原预算约束。运行中断后可通过 run list 找到 ID。当前恢复入口面向 plan、draft、write、review 和 revise 创作运行。
+
 ## 模型契约与离线响应
 
 [ModelGateway](src/llm/model-gateway.ts) 定义文本、结构化结果和 AbortSignal 接口。[FakeProvider](src/llm/fake-provider.ts) 按调用顺序返回预置字符串；结构化生成会解析 JSON 并通过调用方的 Zod schema 校验。

@@ -18,6 +18,10 @@ const migrations = [
   `CREATE TABLE proposals (id TEXT PRIMARY KEY, kind TEXT NOT NULL, base_version INTEGER NOT NULL, revision_id TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL, run_id TEXT NOT NULL REFERENCES runs(id), parent_id TEXT REFERENCES proposals(id), created_at TEXT NOT NULL);
    CREATE TRIGGER immutable_proposal_payload BEFORE UPDATE OF kind, base_version, revision_id, payload, run_id, parent_id ON proposals BEGIN SELECT RAISE(ABORT, 'immutable proposal payload'); END;
    CREATE TABLE write_lease (singleton INTEGER PRIMARY KEY CHECK(singleton = 1), run_id TEXT NOT NULL, token TEXT NOT NULL, pid INTEGER NOT NULL, hostname TEXT NOT NULL, expires_at INTEGER NOT NULL);`,
+  `CREATE TABLE run_artifacts (run_id TEXT NOT NULL REFERENCES runs(id), name TEXT NOT NULL, value TEXT NOT NULL, PRIMARY KEY(run_id, name));
+   CREATE TABLE reviews (id TEXT PRIMARY KEY, revision_id TEXT NOT NULL REFERENCES revisions(id), content_hash TEXT NOT NULL, base_version INTEGER NOT NULL, run_id TEXT NOT NULL REFERENCES runs(id), status TEXT NOT NULL, payload TEXT NOT NULL);
+   CREATE TABLE extractions (id TEXT PRIMARY KEY, revision_id TEXT NOT NULL REFERENCES revisions(id), content_hash TEXT NOT NULL, base_version INTEGER NOT NULL, run_id TEXT NOT NULL REFERENCES runs(id), status TEXT NOT NULL, payload TEXT NOT NULL);
+   CREATE TABLE approvals (request_id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES proposals(id), revision_id TEXT, review_id TEXT, reason TEXT NOT NULL, created_at TEXT NOT NULL);`,
 ];
 
 export class WorkspaceDatabase {
