@@ -6,6 +6,7 @@ import { ProposalStore } from '../storage/proposal-store.js';
 import { RunStore } from '../storage/run-store.js';
 import { ReviewStore } from '../storage/review-store.js';
 import { validateReview, validateExtraction } from '../review/evidence.js';
+import { acceptSelection } from '../proposals/patches.js';
 
 export class ProposalService {
   readonly proposals: ProposalStore;
@@ -22,6 +23,7 @@ export class ProposalService {
       new RunStore(this.book).assertRunnable(current.runId);
       let approvedRevision: string | null = null;
       let approvedReview: string | null = null;
+      let details: unknown = {};
       if (current.kind === 'plan') {
         const payload = PlanPayloadSchema.parse(current.payload);
         for (const plan of payload.plans) state.plans[plan.chapterId] = plan;
@@ -39,9 +41,10 @@ export class ProposalService {
         if (existing) existing.revisionId = revision.id;
         else state.chapters.push({ id: payload.chapterId, title: plan.title, revisionId: revision.id });
         approvedRevision = revision.id; approvedReview = reports.reviewId;
-      } else throw new Error('该提案类型需要先形成可审稿的候选。');
+      } else if (current.kind === 'selection') details = acceptSelection(this.book, current, state, reason);
+      else throw new Error('该提案类型需要先形成可审稿的候选。');
       this.proposals.status(id, 'approved');
-      this.book.db.prepare('INSERT INTO approvals VALUES (?, ?, ?, ?, ?, ?)').run(requestId, id, approvedRevision, approvedReview, reason, new Date().toISOString());
+      this.book.db.prepare('INSERT INTO approvals (request_id, proposal_id, revision_id, review_id, reason, created_at, details) VALUES (?, ?, ?, ?, ?, ?, ?)').run(requestId, id, approvedRevision, approvedReview, reason, new Date().toISOString(), JSON.stringify(details));
       new RunStore(this.book).status(current.runId, 'succeeded');
     });
   }

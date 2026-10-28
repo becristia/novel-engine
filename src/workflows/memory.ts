@@ -18,11 +18,12 @@ export class MemoryWorkflow {
     this.runs = new RunStore(book); this.memory = new MemoryStore(book);
   }
   async rebuild(chapterId?: string) {
-    const chapters = this.book.snapshot().state.chapters.filter(chapter => chapterId === undefined || chapter.id === chapterId);
+    const snapshot = this.book.snapshot();
+    const chapters = snapshot.state.chapters.filter(chapter => chapterId === undefined || chapter.id === chapterId);
     if (chapterId !== undefined && !chapters.length) throw new Error('正式稿中没有该章节。');
     const revisionIds = chapters.filter(chapter => this.memory.needsExtraction(chapter.revisionId) || this.memory.summary(chapter.revisionId) === undefined).map(chapter => chapter.revisionId);
     if (!revisionIds.length) return { rebuilt: [], runId: null };
-    const run = this.runs.create('memory', { revisionIds, configSource: this.configSource, promptVersion: 'memory-v1' }, this.config, this.budget);
+    const run = this.runs.create('memory', { revisionIds, configSource: this.configSource, promptVersion: 'memory-v1' }, this.config, this.budget, snapshot.version);
     return this.execute(run.id, false);
   }
   async resume(id: string, retryUnknown = false) { return this.execute(id, true, retryUnknown); }

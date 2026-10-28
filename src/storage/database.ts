@@ -26,6 +26,8 @@ const migrations = [
    CREATE TABLE memory_entries (id TEXT PRIMARY KEY, kind TEXT NOT NULL, revision_id TEXT NOT NULL REFERENCES revisions(id), content_hash TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL, confirmed INTEGER NOT NULL DEFAULT 0, origin TEXT NOT NULL, parent_id TEXT REFERENCES memory_entries(id));
    CREATE INDEX memory_revision ON memory_entries(revision_id, status);
    CREATE TRIGGER immutable_memory_payload BEFORE UPDATE OF kind, revision_id, content_hash, payload, parent_id ON memory_entries BEGIN SELECT RAISE(ABORT, 'immutable memory payload'); END;`,
+  `ALTER TABLE approvals ADD COLUMN details TEXT NOT NULL DEFAULT '{}';
+   CREATE TABLE selection_keys (request_id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL REFERENCES proposals(id));`,
 ];
 
 export class WorkspaceDatabase {

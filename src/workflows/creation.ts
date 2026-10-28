@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { PlannerOutputSchema, DraftPayloadSchema } from '../domain/planning.js';
 import { ReviewSchema, ExtractionSchema } from '../domain/review.js';
 import type { Review } from '../domain/review.js';
+import { SelectionSchema } from '../domain/patch.js';
 import type { AppConfig } from '../domain/model-config.js';
 import { BookStore } from '../storage/book-store.js';
 import { ProposalStore } from '../storage/proposal-store.js';
@@ -12,6 +13,7 @@ import { RunStore } from '../storage/run-store.js';
 import type { Budget, Run } from '../storage/run-store.js';
 import { buildContext, ContextSchema } from '../context/builder.js';
 import type { ContextSnapshot } from '../context/builder.js';
+import { selectionContext } from '../context/selection.js';
 import { blocks, validateReview, validateExtraction } from '../review/evidence.js';
 import { prompt } from '../agents/prompts.js';
 import { TrackedGateway } from '../llm/tracked-gateway.js';
@@ -46,6 +48,7 @@ export class CreationWorkflow {
   async revise(revisionId: string, instruction: string) {
     if (!instruction.trim()) throw new Error('修订要求不能为空。');
     const target = this.findCandidate(revisionId);
+    if (this.proposals.get(target.proposalId).kind !== 'draft') throw new Error('部分采纳结果请重新分析修改组，不使用整章修订绕过选择。');
     const payload = DraftPayloadSchema.parse(this.proposals.get(target.proposalId).payload);
     const plan = this.book.snapshot().state.plans[payload.chapterId];
     if (!plan) throw new Error('找不到对应的已批准计划。');
@@ -55,9 +58,10 @@ export class CreationWorkflow {
   async review(revisionId: string) {
     const target = this.findCandidate(revisionId);
     const revision = this.book.revision(revisionId);
-    const context = buildContext(this.book, revision.chapterId, this.config);
+    const proposal = this.proposals.get(target.proposalId);
+    const context = proposal.kind === 'selection' ? selectionContext(this.book, proposal, revisionId) : buildContext(this.book, revision.chapterId, this.config);
     const input = ReviewInput.parse({ target, context, configSource: this.configSource, promptVersion: 'reviewer-v1' });
-    return this.execute(this.runs.create('review', input, this.config, this.budget), false);
+    return this.execute(this.runs.create('review', input, this.config, this.budget, context.projectVersion), false);
   }
 
   async resume(id: string, retryUnknown = false) {
@@ -69,11 +73,12 @@ export class CreationWorkflow {
   private async startChapter(kind: 'draft' | 'write' | 'revise', chapter: number, extra: { autoRevise?: boolean; originalRevisionId?: string; instruction?: string } = {}) {
     const context = buildContext(this.book, chapter, this.config);
     const input = ChapterInput.parse({ chapter, context, configSource: this.configSource, promptVersion: 'writer-v1', ...extra });
-    return this.execute(this.runs.create(kind, input, this.config, this.budget), false);
+    if (this.book.snapshot().state.locks.some(lock => lock.chapterId === context.plan.chapterId)) throw new Error('本章存在锁定范围，请使用局部修改提案。');
+    return this.execute(this.runs.create(kind, input, this.config, this.budget, context.projectVersion), false);
   }
 
   private findCandidate(revisionId: string): Artifact {
-    const proposal = this.proposals.list().find(item => item.kind === 'draft' && item.status === 'pending' && DraftPayloadSchema.parse(item.payload).revisionId === revisionId);
+    const proposal = this.proposals.list().find(item => item.status === 'pending' && (item.kind === 'draft' ? DraftPayloadSchema.parse(item.payload).revisionId === revisionId : item.kind === 'selection' && SelectionSchema.parse(item.payload).drafts.some(draft => draft.revisionId === revisionId)));
     if (!proposal || proposal.baseVersion !== this.book.project().version) throw new Error('找不到基于当前项目版本的待批准候选。');
     if (this.runs.get(proposal.runId).cancelled) throw new Error('候选所属运行已取消。');
     return { proposalId: proposal.id, revisionId };
@@ -155,8 +160,8 @@ export class CreationWorkflow {
     if (!artifact.revisionId) throw new Error('审稿缺少目标正文版本。');
     const revision = this.book.revision(artifact.revisionId);
     const proposal = this.proposals.get(artifact.proposalId);
-    const payload = DraftPayloadSchema.parse(proposal.payload);
-    if (proposal.status !== 'pending' || proposal.baseVersion !== run.baseVersion || payload.contentHash !== revision.contentHash || payload.planRevisionId !== context.plan.revisionId) throw new Error('候选、计划或项目版本不一致。');
+    const binding = proposal.kind === 'selection' ? SelectionSchema.parse(proposal.payload).drafts.find(draft => draft.revisionId === revision.id) : DraftPayloadSchema.parse(proposal.payload);
+    if (!binding || proposal.status !== 'pending' || proposal.baseVersion !== run.baseVersion || binding.contentHash !== revision.contentHash || ('planRevisionId' in binding && binding.planRevisionId !== context.plan.revisionId)) throw new Error('候选、计划或项目版本不一致。');
     const sourceIds = new Set([...context.sources.filter(source => !['plan', 'constraint'].includes(source.kind)).map(source => source.revisionId), revision.id]);
     const sources = [...sourceIds].map(id => { const source = this.book.revision(id); return { chapterId: source.chapterId, revisionId: id, contentHash: source.contentHash, blocks: blocks(source.content) }; });
     const reviewKey = `review:${revision.id}`;

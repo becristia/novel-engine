@@ -53,6 +53,14 @@ export class BookStore extends WorkspaceDatabase {
       for (const chapter of state.chapters) {
         if (this.revision(chapter.revisionId).chapterId !== chapter.id) throw new Error('章节与正文版本不匹配。');
       }
+      for (const lock of before.locks) {
+        const kept = state.locks.find(item => item.id === lock.id);
+        if (!kept) continue;
+        const chapter = state.chapters.find(item => item.id === lock.chapterId);
+        if (!chapter || kept.quote !== lock.quote || kept.chapterId !== lock.chapterId || kept.revisionId !== chapter.revisionId) throw new Error('存在锁定范围，请使用受检查的局部提案，或由作者显式解锁。');
+        const revision = this.revision(chapter.revisionId);
+        if (kept.contentHash !== revision.contentHash || revision.content.slice(kept.start, kept.end) !== lock.quote) throw new Error('锁定内容发生变化，提交已拒绝。');
+      }
       const appendOnly = before.chapters.every((chapter, index) => state.chapters[index]?.id === chapter.id && state.chapters[index]?.revisionId === chapter.revisionId);
       if (!appendOnly || JSON.stringify(before.constraints) !== JSON.stringify(state.constraints)) {
         this.db.prepare("UPDATE memory_entries SET status = 'stale' WHERE status = 'fresh'").run();

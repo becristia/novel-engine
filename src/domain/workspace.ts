@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
 import { ApprovedPlanSchema } from './planning.js';
+import { LockSchema } from './patch.js';
 
 export const ChapterRefSchema = z.strictObject({ id: z.string(), title: z.string(), revisionId: z.string() });
 export const BookStateSchema = z.strictObject({
@@ -9,6 +10,7 @@ export const BookStateSchema = z.strictObject({
   plans: z.record(z.string(), ApprovedPlanSchema).default({}),
   confirmedFactIds: z.array(z.string()).default([]),
   aliases: z.record(z.string(), z.array(z.string())).default({}),
+  locks: z.array(LockSchema).default([]),
 });
 export type BookState = z.infer<typeof BookStateSchema>;
 export interface Snapshot { version: number; state: BookState }

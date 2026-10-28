@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { BookStore } from './book-store.js';
 
 export interface Proposal {
-  id: string; kind: 'plan' | 'draft' | 'patch'; baseVersion: number; revisionId: string; payload: unknown;
+  id: string; kind: 'plan' | 'draft' | 'patch' | 'selection'; baseVersion: number; revisionId: string; payload: unknown;
   status: 'pending' | 'approved' | 'rejected' | 'stale' | 'superseded'; runId: string; parentId: string | null;
 }
 export class ProposalStore {

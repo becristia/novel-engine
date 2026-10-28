@@ -131,6 +131,25 @@ npm run novel -- --project ./books/demo constraints set --file ./constraints.jso
 
 上下文保留硬约束和当前计划，优先最近正式正文，再按人物、别名和关键词选择已确认事实及旧章来源；每项来源记录版本、选择理由和估算，省略项也记录原因。事实、角色误信、未来计划分别分组。计划可设置 viewpointCharacter；仅有明确角色和获知时间证据的信息进入该视角的已知组，缺少证据保留未知。章序只用于叙述披露范围，不推断故事发生时间。单值关系在同一明确时间出现多个值时显示待核对冲突，多件物品会并存。
 
+## 局部修订、锁定与撤回
+
+```bash
+npm run novel -- --project ./books/demo --config ./novel.config.json chapter impact --chapter <chapter-id> --instruction "推迟角色得知秘密的时间。"
+npm run novel -- --project ./books/demo proposal preview <patch-id> --groups <group-id> <group-id>
+npm run novel -- --project ./books/demo proposal select <patch-id> --groups <group-id> <group-id>
+npm run novel -- --project ./books/demo --config ./novel.config.json chapter review --revision <selected-revision-id>
+npm run novel -- --project ./books/demo proposal approve <selected-proposal-id>
+npm run novel -- --project ./books/demo proposal undo <selected-proposal-id> --expected-version <version>
+```
+
+impact 按人物与别名筛选候选章节，返回已检查与省略的章节范围；影响分为直接冲突与待作者判断的因果影响。没有人物线索时检查全部正式章节，超预算会失败，不宣称覆盖未检查范围。
+
+preview 返回替换前后正文与修改位置。select 是本地动作，先检查依赖、重叠、来源版本和锁定范围，再为实际所选内容生成新候选。多章选择需逐一审稿；审稿使用所选候选形成的整本书视图。完整方案的报告不能代替部分结果的报告。批准后原修改提案标为 stale，剩余修改用 `proposal revalidate <patch-id>` 在当前基线上重新分析，此命令会调用模型。
+
+`chapter show <id>` 返回区块与 UTF-16 位置。`lock add --chapter <id> --block <block-id>` 锁定区块，`lock list` 查看，`lock remove <lock-id>` 由作者解锁。整章替换不能绕过锁定；局部修改会保持锁定文字并更新位置。
+
+undo 通过创建新正文版本恢复选择前的内容；若相关章节已有后续修改或新锁定阻止恢复，则拒绝覆盖。也可使用 `chapter restore <id> --revision <old-revision-id> --expected-version <version>` 显式恢复同章历史正文。
+
 ## 模型契约与离线响应
 
 [ModelGateway](src/llm/model-gateway.ts) 定义文本、结构化结果和 AbortSignal 接口。[FakeProvider](src/llm/fake-provider.ts) 按调用顺序返回预置字符串；结构化生成会解析 JSON 并通过调用方的 Zod schema 校验。

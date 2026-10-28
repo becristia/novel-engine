@@ -4,6 +4,7 @@ import { positiveInteger, versionNumber } from '../domain/workspace.js';
 import { createWorkspace, CommitService } from '../application/workspace.js';
 import { BookStore } from '../storage/book-store.js';
 import type { CliIO } from './program.js';
+import { blocks } from '../review/evidence.js';
 
 export async function withWorkspace<T>(command: Command, action: (store: BookStore) => T | Promise<T>): Promise<T> {
   const directory = command.optsWithGlobals<{ project?: string }>().project;
@@ -36,7 +37,8 @@ export function registerWorkspaceCommands(program: Command, io: CliIO): void {
       show(await withWorkspace(command, store => {
         const selected = store.snapshot(options.version).state.chapters.find(item => item.id === id);
         if (!selected) throw new Error('指定版本中没有该章节。');
-        return store.revision(selected.revisionId);
+        const revision = store.revision(selected.revisionId);
+        return { ...revision, blocks: blocks(revision.content) };
       }));
     });
   chapter.command('replace <id>').requiredOption('--file <file>', '作者修订的正文文件。').requiredOption('--expected-version <version>', '预期项目版本。', versionNumber)

@@ -65,7 +65,7 @@ export class MemoryStore {
         if (entry.kind !== 'fact' || entry.status === 'stale') throw new Error('只能确认未失效的事实。');
         resolveReference(this.book, FactSchema.parse(JSON.parse(entry.payload)).evidence, new Set([entry.revisionId]));
         if (entry.status === 'pending') {
-          const available = this.book.db.prepare("SELECT p.id FROM proposals p JOIN runs r ON p.run_id = r.id WHERE p.kind = 'draft' AND p.status = 'pending' AND p.base_version = ? AND r.cancelled = 0 AND json_extract(p.payload, '$.revisionId') = ?").get(this.book.project().version, entry.revisionId);
+          const available = this.book.db.prepare("SELECT p.id FROM proposals p JOIN runs r ON p.run_id = r.id WHERE p.status = 'pending' AND p.base_version = ? AND r.cancelled = 0 AND ((p.kind = 'draft' AND json_extract(p.payload, '$.revisionId') = ?) OR (p.kind = 'selection' AND EXISTS (SELECT 1 FROM json_each(p.payload, '$.drafts') WHERE json_extract(value, '$.revisionId') = ?)))").get(this.book.project().version, entry.revisionId, entry.revisionId);
           if (!available) throw new Error('事实来源候选已过期，不能确认。');
         }
       }

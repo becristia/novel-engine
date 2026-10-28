@@ -29,12 +29,16 @@ export class RunStore {
     this.book.db.prepare('INSERT INTO run_artifacts VALUES (?, ?, ?)').run(id, name, JSON.stringify(value));
   }
 
-  create(kind: string, input: unknown, config: AppConfig, budget: Budget): Run {
+  create(kind: string, input: unknown, config: AppConfig, budget: Budget, expectedBaseVersion?: number): Run {
     const id = randomUUID();
     const parsedConfig = AppConfigSchema.parse(config);
     const parsedBudget = BudgetSchema.parse(budget);
-    this.book.db.prepare('INSERT INTO runs (id, kind, base_version, input, config, budget, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
-      .run(id, kind, this.book.project().version, JSON.stringify(input), JSON.stringify(parsedConfig), JSON.stringify(parsedBudget), 'queued', new Date().toISOString());
+    this.book.db.transaction(() => {
+      const version = this.book.project().version;
+      if (expectedBaseVersion !== undefined && version !== expectedBaseVersion) throw new Error('创建运行前输入快照已改变，请重新准备上下文。');
+      this.book.db.prepare('INSERT INTO runs (id, kind, base_version, input, config, budget, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+        .run(id, kind, version, JSON.stringify(input), JSON.stringify(parsedConfig), JSON.stringify(parsedBudget), 'queued', new Date().toISOString());
+    }).immediate();
     return this.get(id);
   }
 
