@@ -1,0 +1,16 @@
+{
+  "id": "harbor-light",
+  "title": "港口旧灯",
+  "language": "zh-CN",
+  "purpose": "离线工程测试元数据，不作为创作质量评测样例。",
+  "constraints": ["第三章之前，林舟不知道灯塔钥匙在顾遥手中。"],
+  "characters": [
+    { "id": "lin-zhou", "name": "林舟" },
+    { "id": "gu-yao", "name": "顾遥" }
+  ],
+  "chapters": [
+    { "id": "arrival", "order": 1, "title": "归港", "goal": "林舟发现旧灯塔重新亮起。" },
+    { "id": "trace", "order": 2, "title": "寻迹", "goal": "林舟调查灯光来源，顾遥保守钥匙的秘密。" },
+    { "id": "reveal", "order": 3, "title": "交钥", "goal": "顾遥交出钥匙，林舟首次知道钥匙归属。" }
+  ]
+}

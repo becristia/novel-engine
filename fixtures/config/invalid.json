@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "model": {
+    "provider": "fake",
+    "modelId": "fake-v1",
+    "maxOutputTokens": 0
+  }
+}

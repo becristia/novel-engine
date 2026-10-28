@@ -1,0 +1,40 @@
+# Dependencies and generated output
+node_modules/
+dist/
+coverage/
+.tmp/
+*.tsbuildinfo
+*.log
+
+# Local configuration and credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+novel.config.json
+novel.config.*.json
+!novel.config.example.json
+
+# Manuscripts and local runtime data
+books/
+exports/
+debug/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# System and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# Local agent configuration
+.codex/
+.claude/
+.cursor/
+.opencode/
