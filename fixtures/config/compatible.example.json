@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "model": {
+    "provider": "openai-compatible",
+    "modelId": "deepseek-chat",
+    "baseURL": "https://api.deepseek.com",
+    "apiKeyEnv": "DEEPSEEK_API_KEY",
+    "maxOutputTokens": 2048,
+    "contextWindowTokens": 16384,
+    "timeoutMs": 60000
+  }
+}

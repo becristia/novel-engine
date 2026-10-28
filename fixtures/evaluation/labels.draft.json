@@ -1,0 +1,13 @@
+{
+  "version": "draft-v1",
+  "humanApproved": false,
+  "source": "five-chapter.md",
+  "cases": [
+    { "id": "chronology", "kind": "flashback", "evidence": "故事回到 2020 年。", "expectation": "第二章的事件不能因章序靠后就被认为晚于第一章。" },
+    { "id": "belief", "kind": "belief-vs-fact", "evidence": "以为邮局的钥匙是铜制的。", "expectation": "角色误信不能覆盖铁钥匙的故事事实。" },
+    { "id": "knowledge", "kind": "knowledge-time", "evidence": "陈禾第一次看清钥匙", "expectation": "陈禾在第四章才确认钥匙材质。" },
+    { "id": "future", "kind": "planned-event", "evidence": "柜子此刻仍然关着", "expectation": "计划开柜不能变成已经开柜。" },
+    { "id": "negative-control", "kind": "no-conflict", "evidence": "墙上的木钟停在四点。", "expectation": "没有后续证据时，不应臆造钟表相关矛盾。" }
+  ],
+  "notice": "以上为 Agent 提议的待人工核对标签，不计为人工标注或已通过的质量评测。"
+}

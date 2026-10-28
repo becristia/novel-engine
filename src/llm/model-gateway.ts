@@ -15,6 +15,7 @@ export interface ModelResult<T> {
   value: T;
   modelId: string;
   usage: ModelUsage | null;
+  finishReason?: string;
 }
 
 export interface StructuredModelRequest<T> extends ModelRequest {

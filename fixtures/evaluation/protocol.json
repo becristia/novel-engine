@@ -1,0 +1,10 @@
+{
+  "version": "draft-v1",
+  "status": "awaiting-human-annotation-and-live-pilot",
+  "minimumRunsPerArm": 3,
+  "primaryMetric": "median-active-editing-time",
+  "provisionalImprovement": 0.2,
+  "qualityGuards": ["conflict-recall-not-lower", "false-positives-not-higher", "zero-unapproved-locked-edits"],
+  "requirements": ["same-model-and-source-material", "record-all-attempt-costs", "human-reference-labels", "separate-holdout", "freeze-before-tuning"],
+  "provenance": "Agent-proposed protocol; not human-validated and not frozen."
+}

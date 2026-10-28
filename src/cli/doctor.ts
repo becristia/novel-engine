@@ -4,7 +4,7 @@ export interface DoctorReport {
   ok: boolean;
   offline: true;
   node: { version: string; supported: boolean };
-  config: { source: string; provider: 'fake'; modelId: 'fake-v1' };
+  config: { source: string; provider: 'fake' | 'openai-compatible'; modelId: string };
 }
 
 export function isSupportedNode(version: string): boolean {

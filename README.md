@@ -25,7 +25,7 @@ npm run novel -- doctor --offline --config ./novel.config.example.json
 npm run novel -- doctor --offline --json
 ```
 
-配置格式：
+假模型配置格式：
 
 ```json
 {
@@ -38,7 +38,24 @@ npm run novel -- doctor --offline --json
 }
 ```
 
-`maxOutputTokens` 必须是正的安全整数。配置仅接受示例中的字段及 provider、modelId；多余字段、无效 JSON 或显式指定但不存在的文件都会失败，不会静默回退。错误输出不包含配置值或原始 JSON。
+`maxOutputTokens` 必须是正的安全整数。模型配置还支持 `contextWindowTokens`（默认 16384）与 `timeoutMs`（默认 30000）。多余字段、无效 JSON 或显式指定但不存在的文件都会失败，不会静默回退。错误输出不包含配置值或原始 JSON。
+
+真实模型配置示例见 [compatible.example.json](fixtures/config/compatible.example.json)，使用 HTTPS 的 OpenAI 兼容 Chat Completions 接口，密钥只通过 `apiKeyEnv` 指定的环境变量读取。示例中的地址与模型名应按实际供应商配置。离线 doctor 只检查配置，不测试服务连通。
+
+## 模型探测与运行记录
+
+```bash
+npm run novel -- --project ./books/demo models probe --max-requests 1 --max-tokens 4096
+npm run novel -- --project ./books/demo --config ./fixtures/config/compatible.example.json models probe
+npm run novel -- --project ./books/demo run inspect <run-id>
+npm run novel -- --project ./books/demo run cancel <run-id>
+```
+
+第一条命令使用内置假模型；第二条在配置对应密钥后会调用真实 API，产生供应商用量。普通测试使用模拟 HTTP 响应验证适配器，不连接真实供应商。
+
+每次请求发送前持久化预算预留，原始响应先保存再解析；SDK 自动重试关闭，输出修复与重试最多两次尝试且共享运行预算。缺失 usage 或价格时费用保持未知；可选 `prices` 包含 `inputPerMillion`、`outputPerMillion`（USD／百万 token）与 `version`，估算不是最终账单。超时或断线的请求记录为 unknown，不自动重发，也不会释放可能已消费的预算。取消后的结果不能继续提交。
+
+FakeProvider 可用 `responsesFile` 指定 JSON 字符串数组，路径相对于配置文件；未指定时只提供一次探测响应。模型原始输出与提示词保存在本地工作区，分享运行记录前应检查其中的稿件内容。
 
 成功退出码为 `0`；参数、配置或运行环境错误为 `1`。`--json` 的成功输出是单个 JSON 对象，失败诊断写入标准错误。可以用以下命令检查配置失败路径，预期退出码为 `1`：
 

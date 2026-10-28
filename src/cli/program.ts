@@ -3,6 +3,7 @@ import { ConfigurationError } from '../llm/config.js';
 import { runDoctor } from './doctor.js';
 import { formatField, formatHumanText } from './format.js';
 import { registerWorkspaceCommands } from './workspace-commands.js';
+import { registerRunCommands } from './run-commands.js';
 
 export interface CliIO {
   stdout: (text: string) => void;
@@ -34,11 +35,11 @@ export async function runCli(args: string[], io: CliIO = defaultIO): Promise<num
     .option('--offline', formatHumanText('仅检查本地环境，不调用模型。'))
     .option('--config <path>', formatHumanText('指定 JSON 配置文件；默认使用内置假模型配置。'))
     .option('--json', formatHumanText('输出机器可读的 JSON。'))
-    .action(async (options: { offline?: boolean; config?: string; json?: boolean }) => {
+    .action(async (options: { offline?: boolean; config?: string; json?: boolean }, command: Command) => {
       if (!options.offline) {
         throw new Error('请添加 --offline 执行离线检查。');
       }
-      const report = await runDoctor(options.config);
+      const report = await runDoctor(options.config ?? command.optsWithGlobals<{ config?: string }>().config);
       exitCode = report.ok ? 0 : 1;
       if (options.json) {
         io.stdout(`${JSON.stringify(report, null, 2)}\n`);
@@ -53,6 +54,7 @@ export async function runCli(args: string[], io: CliIO = defaultIO): Promise<num
     });
 
   registerWorkspaceCommands(program, io);
+  registerRunCommands(program, io);
 
   try {
     await program.parseAsync(args, { from: 'user' });

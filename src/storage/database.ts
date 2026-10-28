@@ -12,6 +12,9 @@ const migrations = [
    CREATE TRIGGER immutable_revisions_delete BEFORE DELETE ON revisions BEGIN SELECT RAISE(ABORT, 'immutable revision'); END;
    CREATE TRIGGER immutable_snapshots_update BEFORE UPDATE ON snapshots BEGIN SELECT RAISE(ABORT, 'immutable snapshot'); END;
    CREATE TRIGGER immutable_snapshots_delete BEFORE DELETE ON snapshots BEGIN SELECT RAISE(ABORT, 'immutable snapshot'); END;`,
+  `CREATE TABLE runs (id TEXT PRIMARY KEY, kind TEXT NOT NULL, base_version INTEGER NOT NULL, input TEXT NOT NULL, config TEXT NOT NULL, budget TEXT NOT NULL, status TEXT NOT NULL, error TEXT, cancelled INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
+   CREATE TABLE attempts (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(id), step TEXT NOT NULL, input_hash TEXT NOT NULL, prompt TEXT NOT NULL, max_output_tokens INTEGER NOT NULL, reserved_tokens INTEGER NOT NULL, status TEXT NOT NULL, raw TEXT, usage TEXT, estimated_cost REAL, price_version TEXT, error TEXT, started_at TEXT NOT NULL, finished_at TEXT);
+   CREATE INDEX attempts_run_step ON attempts(run_id, step);`,
 ];
 
 export class WorkspaceDatabase {
