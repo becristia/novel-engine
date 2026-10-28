@@ -1,10 +1,12 @@
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
+import { ApprovedPlanSchema } from './planning.js';
 
 export const ChapterRefSchema = z.strictObject({ id: z.string(), title: z.string(), revisionId: z.string() });
 export const BookStateSchema = z.strictObject({
   chapters: z.array(ChapterRefSchema),
   constraints: z.array(z.string()),
+  plans: z.record(z.string(), ApprovedPlanSchema).default({}),
 });
 export type BookState = z.infer<typeof BookStateSchema>;
 export interface Snapshot { version: number; state: BookState }

@@ -15,10 +15,11 @@ async function withAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise
 }
 
 export class TrackedGateway implements ModelGateway {
-  constructor(readonly runs: RunStore, readonly runId: string, readonly step: string, readonly transport: TextTransport, readonly retryUnknown = false) {}
+  constructor(readonly runs: RunStore, readonly runId: string, readonly step: string, readonly transport: TextTransport, readonly retryUnknown = false, readonly assertOwnership: () => void = () => {}) {}
 
   private async execute<T>(request: ModelRequest, schema?: z.ZodType<T>): Promise<ModelResult<T | string>> {
     request.signal?.throwIfAborted();
+    this.assertOwnership();
     const run = this.runs.assertRunnable(this.runId);
     if (!request.prompt.trim() || !Number.isSafeInteger(request.maxOutputTokens) || request.maxOutputTokens < 1) throw new Error('模型请求参数无效。');
     if (request.maxOutputTokens > run.config.model.maxOutputTokens) throw new Error('请求超出配置中的单次输出上限。');
@@ -52,12 +53,14 @@ export class TrackedGateway implements ModelGateway {
     const failures = this.runs.attempts(this.runId, this.step).filter(attempt => attempt.status === 'failed').length;
     for (let retry = failures; retry < 2; retry += 1) {
       const attempt = this.runs.reserve(this.runId, this.step, fingerprint, prompt, request.maxOutputTokens);
+      this.assertOwnership();
       const timeout = AbortSignal.timeout(run.config.model.timeoutMs);
       const signal = request.signal ? AbortSignal.any([request.signal, timeout]) : timeout;
       let response: ModelResult<string>;
       try {
         response = await withAbort(this.transport.generateText({ prompt, maxOutputTokens: request.maxOutputTokens, signal }), signal);
       } catch (error) {
+        this.assertOwnership();
         const known = error instanceof RequestFailure && error.outcome === 'known';
         const code = error instanceof RequestFailure ? error.code : 'response-not-confirmed';
         this.runs.finishAttempt(attempt.id, known ? 'failed' : 'unknown', code);
@@ -66,6 +69,7 @@ export class TrackedGateway implements ModelGateway {
         if (known && error.retryable && retry === 0) continue;
         throw new Error(known ? `模型请求被拒绝：${code}。` : '模型请求结果不明，已保留预算和 unknown 记录，未自动重发。');
       }
+      this.assertOwnership();
       this.runs.receive(attempt, response.value, response.usage);
       if (response.finishReason === 'length' || response.finishReason === 'content-filter') {
         this.runs.finishAttempt(attempt.id, 'failed', 'incomplete-output');

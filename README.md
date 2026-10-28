@@ -79,6 +79,23 @@ npm run novel -- --project ./books/demo export --version 1 --format markdown --o
 
 `chapter show <id> --version <version>` 查看历史正文；导出支持 markdown 和 txt（去除二级标题标记），目标文件必须不存在，避免覆盖已有稿件。工作区权威数据位于 novel.db，导出文件的修改不会自动回写。
 
+## 规划与候选稿
+
+```bash
+npm run novel -- --project ./books/demo --config ./novel.config.json plan --brief ./brief.txt --chapters 3
+npm run novel -- --project ./books/demo proposal list
+npm run novel -- --project ./books/demo proposal show <proposal-id>
+npm run novel -- --project ./books/demo proposal edit-plan <proposal-id> --chapter 2 --file ./chapter-plan.json
+npm run novel -- --project ./books/demo proposal approve <proposal-id>
+npm run novel -- --project ./books/demo chapter draft --chapter 1 --dry-run
+npm run novel -- --project ./books/demo --config ./novel.config.json chapter draft --chapter 1
+npm run novel -- --project ./books/demo proposal reject <proposal-id>
+```
+
+全局 `--project` 与 `--config` 放在子命令前。计划编辑文件包含 title、goal、characters、constraints、events 和 targetLength；编辑产生新的提案 ID，原提案标记为 superseded。每批规划支持 1～20 章。
+
+Writer 只使用已批准的计划和正式正文；候选与拒绝稿不会进入导出或后续上下文。dry-run 只读取固定来源，不创建运行或调用模型。每部作品同时只允许一个模型写任务；运行检查输入版本与写入权，旧进程的迟到响应不能保存为新候选。请求数默认上限为 8，运行 token 预算默认 64000，可用 `--max-requests` 与 `--max-tokens` 调整。
+
 ## 模型契约与离线响应
 
 [ModelGateway](src/llm/model-gateway.ts) 定义文本、结构化结果和 AbortSignal 接口。[FakeProvider](src/llm/fake-provider.ts) 按调用顺序返回预置字符串；结构化生成会解析 JSON 并通过调用方的 Zod schema 校验。

@@ -7,6 +7,7 @@ import { TrackedGateway } from '../llm/tracked-gateway.js';
 import { RunStore } from '../storage/run-store.js';
 import { withWorkspace } from './workspace-commands.js';
 import type { CliIO } from './program.js';
+import { withRunLease } from '../workflows/lease.js';
 
 export function registerRunCommands(program: Command, io: CliIO): void {
   const show = (value: unknown) => io.stdout(`${JSON.stringify(value, null, 2)}\n`);
@@ -21,15 +22,17 @@ export function registerRunCommands(program: Command, io: CliIO): void {
         const runs = new RunStore(book);
         const run = runs.create('probe', {}, loaded.config, { maxRequests: options.maxRequests, maxTokens: options.maxTokens });
         show({ runId: run.id, provider: loaded.config.model.provider });
+        await withRunLease(runs, run.id, async lease => {
         try {
-          const gateway = new TrackedGateway(runs, run.id, 'probe:v1', transport);
+          const gateway = new TrackedGateway(runs, run.id, 'probe:v1', transport, false, lease.assert);
           const result = await gateway.generateObject({ prompt: '返回一个对象，ok 为 true。', maxOutputTokens: 128, schema: z.strictObject({ ok: z.literal(true) }) });
           runs.status(run.id, 'succeeded');
           show(result);
         } catch (error) {
-          runs.status(run.id, 'failed', 'probe-failed');
+          lease.fail('probe-failed');
           throw error;
         }
+        });
       });
     });
   const run = program.command('run').description('查看和取消持久化运行。');

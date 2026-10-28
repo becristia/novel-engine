@@ -15,6 +15,9 @@ const migrations = [
   `CREATE TABLE runs (id TEXT PRIMARY KEY, kind TEXT NOT NULL, base_version INTEGER NOT NULL, input TEXT NOT NULL, config TEXT NOT NULL, budget TEXT NOT NULL, status TEXT NOT NULL, error TEXT, cancelled INTEGER NOT NULL DEFAULT 0, created_at TEXT NOT NULL);
    CREATE TABLE attempts (id TEXT PRIMARY KEY, run_id TEXT NOT NULL REFERENCES runs(id), step TEXT NOT NULL, input_hash TEXT NOT NULL, prompt TEXT NOT NULL, max_output_tokens INTEGER NOT NULL, reserved_tokens INTEGER NOT NULL, status TEXT NOT NULL, raw TEXT, usage TEXT, estimated_cost REAL, price_version TEXT, error TEXT, started_at TEXT NOT NULL, finished_at TEXT);
    CREATE INDEX attempts_run_step ON attempts(run_id, step);`,
+  `CREATE TABLE proposals (id TEXT PRIMARY KEY, kind TEXT NOT NULL, base_version INTEGER NOT NULL, revision_id TEXT NOT NULL, payload TEXT NOT NULL, status TEXT NOT NULL, run_id TEXT NOT NULL REFERENCES runs(id), parent_id TEXT REFERENCES proposals(id), created_at TEXT NOT NULL);
+   CREATE TRIGGER immutable_proposal_payload BEFORE UPDATE OF kind, base_version, revision_id, payload, run_id, parent_id ON proposals BEGIN SELECT RAISE(ABORT, 'immutable proposal payload'); END;
+   CREATE TABLE write_lease (singleton INTEGER PRIMARY KEY CHECK(singleton = 1), run_id TEXT NOT NULL, token TEXT NOT NULL, pid INTEGER NOT NULL, hostname TEXT NOT NULL, expires_at INTEGER NOT NULL);`,
 ];
 
 export class WorkspaceDatabase {
