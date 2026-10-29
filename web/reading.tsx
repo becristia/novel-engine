@@ -38,5 +38,9 @@ export function contextText(source: ContextSnapshot['sources'][number]): string 
 }
 export function ContextList({ context }: { context: ContextSnapshot }) {
   const omissions = context.omissions ?? [];
-  return <div className="context-list"><p className="help-text">当前输入保守估算 {context.estimatedTokens.toLocaleString()} token；最终用量以供应商返回为准。</p>{context.sources.map((source, i) => <details className="source-item" key={`${source.id}:${i}`}><summary><Badge>{sourceNames[source.kind]}</Badge><span>{contextText(source).slice(0, 65)}</span><Badge tone="green">已采用</Badge></summary><p className="help-text">{source.reason}</p><div className="source-text">{contextText(source)}</div></details>)}{omissions.length > 0 && <details className="source-item"><summary>省略了 {omissions.length} 项来源</summary>{omissions.map((item, index) => <p className="help-text" key={index}>{item.reason === 'budget' ? '超出本次上下文预算' : '未命中本章人物或别名'}</p>)}</details>}</div>;
+  return <div className="context-list"><p className="help-text">当前输入保守估算 {context.estimatedTokens.toLocaleString()} token；最终用量以供应商返回为准。</p>{context.sources.map((source, i) => {
+    const kind = source.kind === 'fact' ? (JSON.parse(source.text) as { kind: string }).kind : null;
+    const label = kind === 'belief' ? '角色误信' : kind === 'plan' ? '未来计划' : sourceNames[source.kind];
+    return <details className="source-item" key={`${source.id}:${i}`}><summary><Badge>{label}</Badge><span>{contextText(source).slice(0, 65)}</span><Badge tone="green">已采用</Badge></summary><p className="help-text">{source.reason}</p><div className="source-text">{contextText(source)}</div></details>;
+  })}{omissions.length > 0 && <details className="source-item"><summary>省略了 {omissions.length} 项来源</summary>{omissions.map((item, index) => <p className="help-text" key={index}>{item.reason === 'budget' ? '超出本次上下文预算' : '未命中本章人物或别名'}</p>)}</details>}</div>;
 }

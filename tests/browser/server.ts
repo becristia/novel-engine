@@ -31,6 +31,11 @@ function fixtureResponse(request: ModelRequest): string {
     const block = source.blocks.find(item => item.text.includes('铜钥匙'));
     return JSON.stringify({ facts: block ? [{ subject: '林舟', relation: 'possession', value: '铜钥匙', kind: 'fact', characterId: '林舟', storyTime: null, knowledgeTime: null, evidence: { chapterId: source.chapterId, revisionId: source.revisionId, blockId: block.id, quote: block.text } }] : [] });
   }
+  if (request.prompt.startsWith('生成简短的章节摘要')) {
+    const source = JSON.parse(request.prompt.split('\n').find(line => line.startsWith('{"chapterId"'))!) as { chapterId: string; revisionId: string; blocks: { id: string; text: string }[] };
+    const block = source.blocks.find(item => !item.text.startsWith('##'))!;
+    return JSON.stringify({ summary: block.text, evidence: [{ chapterId: source.chapterId, revisionId: source.revisionId, blockId: block.id, quote: block.text }] });
+  }
   if (request.prompt.startsWith('返回一个对象')) return '{"ok":true}';
   throw new Error('Browser fixture received an unsupported prompt.');
 }
