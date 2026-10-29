@@ -3,7 +3,7 @@ import { readFile, realpath } from 'node:fs/promises';
 import { resolve, relative, extname, sep } from 'node:path';
 import { createWorkbenchApp, MAX_BODY_BYTES } from './app.js';
 import type { AppOptions } from './app.js';
-import { publicError } from '../application/workbench-errors.js';
+import { HttpError, publicError } from '../application/workbench-errors.js';
 
 export function createHttpServer(options: Omit<AppOptions, 'origin'> & { staticDirectory: string }) {
   let origin = 'http://127.0.0.1';
@@ -26,7 +26,11 @@ export function createHttpServer(options: Omit<AppOptions, 'origin'> & { staticD
         response = await app.handle(new Request(url, { headers, method, ...(['GET', 'HEAD'].includes(method) ? {} : { body: Buffer.concat(chunks) }) }));
       } else {
         if (incoming.method !== 'GET' && incoming.method !== 'HEAD') { outgoing.writeHead(405); outgoing.end(); return; }
-        const root = resolve(options.staticDirectory); const path = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
+        const root = await realpath(options.staticDirectory);
+        let path: string;
+        try { path = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname); }
+        catch { throw new HttpError(400, 'invalid-path', '资源路径编码无效。'); }
+        if (path.includes('\0')) throw new HttpError(400, 'invalid-path', '资源路径包含无效字符。');
         const file = await realpath(resolve(root, `.${path}`)); const rel = relative(root, file);
         if (rel === '..' || rel.startsWith(`..${sep}`)) { outgoing.writeHead(403); outgoing.end(); return; }
         const types: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2' };
@@ -38,7 +42,8 @@ export function createHttpServer(options: Omit<AppOptions, 'origin'> & { staticD
       }
       outgoing.writeHead(response.status, Object.fromEntries(response.headers)); outgoing.end(Buffer.from(await response.arrayBuffer()));
     } catch (error) {
-      const result = publicError(error); outgoing.writeHead(result.status, { 'Content-Type': 'application/json' }); outgoing.end(JSON.stringify({ error: { code: result.code, message: result.message } }));
+      const missing = error instanceof Error && 'code' in error && ['ENOENT', 'ENOTDIR', 'EISDIR'].includes(String(error.code));
+      const result = publicError(missing ? new HttpError(404, 'not-found', '资源不存在。') : error); outgoing.writeHead(result.status, { 'Content-Type': 'application/json' }); outgoing.end(JSON.stringify({ error: { code: result.code, message: result.message } }));
     }
   });
   return { app, server, listen: (port = 3917): Promise<string> => new Promise((resolveListen, reject) => {

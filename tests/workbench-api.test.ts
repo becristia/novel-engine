@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
+import { mkdir, mkdtemp, rename, rm, symlink } from 'node:fs/promises';
 import { resolve, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Library } from '../src/server/library.js';
@@ -75,6 +75,33 @@ describe('local workbench boundary and workflows', () => {
     expect(await historical.text()).toContain('归港。');
     expect((await call(`/workspaces/${id}/import`, 'POST', { ...payload, filename: '../escape.md' })).status).toBe(400);
     expect(factory).not.toHaveBeenCalled();
+  });
+
+  it('rejects database file symlinks on registration and on later workspace access', async () => {
+    const outside = join(directory, 'outside'); createWorkspace(outside, '外部作品');
+    const linked = join(library.root, 'linked'); await mkdir(linked);
+    await symlink(join(outside, 'novel.db'), join(linked, 'novel.db'));
+    expect((await call('/workspaces', 'POST', { directory: 'linked' })).status).toBe(403);
+    const registered = join(library.root, 'book', 'novel.db');
+    await rename(registered, `${registered}.saved`); await symlink(join(outside, 'novel.db'), registered);
+    expect((await call(`/workspaces/${id}`)).status).toBe(403);
+    expect(factory).not.toHaveBeenCalled();
+  });
+
+  it.each(['novel.db-wal', 'novel.db-shm', 'novel.db-journal'])('rejects a dangling SQLite companion symlink: %s', async filename => {
+    await symlink(join(directory, 'outside-data'), join(library.root, 'book', filename));
+    expect((await call(`/workspaces/${id}`)).status).toBe(403);
+  });
+
+  it('requires explicit nonnegative integer versions for history and export', async () => {
+    for (const resource of ['snapshot', 'export']) {
+      for (const version of [null, '', ' ', '-1', '1.5', '1e0', 'NaN', '9007199254740992']) {
+        const query = new URLSearchParams({ format: 'txt' }); if (version !== null) query.set('version', version);
+        expect((await call(`/workspaces/${id}/${resource}?${query}`)).status, `${resource}: ${version}`).toBe(400);
+      }
+      expect((await call(`/workspaces/${id}/${resource}?version=0&format=txt`)).status).toBe(200);
+    }
+    expect((await view()).project.version).toBe(0); expect(factory).not.toHaveBeenCalled();
   });
 
   it('never returns credentials in model configuration', async () => {

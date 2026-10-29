@@ -38,6 +38,8 @@ npm run web -- --library ./books
 
 版本与导出可查看固定项目快照、按选定版本下载 Markdown／TXT、预览并恢复同章历史正文，也可在当前版本调整章节顺序。导出只包含选定快照的正式稿；历史查看、当前作品和恢复后的新版本分别标明。
 
+窄窗口将功能导航收起为具名图标，章节页提供顶部章节选择。Tab 可访问表单与操作按钮，页签支持方向键和 Home／End；弹窗关闭后恢复焦点，Esc 离开未保存的正文编辑时仍须确认。页面截图和验收范围见[工作台验收记录](docs/implementation/workbench-acceptance.md)。
+
 ## 配置检查
 
 不传 `--config` 时，doctor 校验内置的 FakeProvider 配置。它不会自动读取当前目录的配置文件。
@@ -206,6 +208,8 @@ node dist/cli/main.js doctor --offline --json
 
 `npm run test:web` 在独立临时工作区运行浏览器验收，不调用真实供应商；先执行 `npm run build`。macOS 存在 Google Chrome 时直接使用，否则使用 Playwright Chromium，首次使用可运行 `npx playwright install chromium`。测试截图、trace 和临时数据库位于 `.tmp/ui-implementation/`。
 
+浏览器测试会自行启动本地测试服务，端口为 3918。固定响应入口位于 `tests/browser/server.ts`，通过真实核心的规划、审稿和证据契约构造验收材料；它不属于生产模型配置，也不需要真实 API 凭据。测试同时检查 1586 × 992 桌面页面、1024／900 像素窄窗口和键盘流程。
+
 ## 文档入口
 
 - [项目规范](AGENTS.md)：目录职责、工程边界与验证入口。
@@ -213,5 +217,6 @@ node dist/cli/main.js doctor --offline --json
 - [开发计划](TypeScript%20小说多%20Agent%20项目开发计划.md)：目标流程、数据契约、里程碑和效果验收。
 - [UI 工作台设计](docs/design/workbench.md)：基于当前核心的功能方案、接口边界和八张概念图。
 - [工作台执行计划](docs/implementation/workbench-plan.md)：分步实施范围、检查入口与验收标准。
+- [工作台验收记录](docs/implementation/workbench-acceptance.md)：实际页面截图、离线流程、分步提交与验收限制。
 
 工程为私有本地项目，`package.json` 设置了 `private: true` 和 `UNLICENSED`。

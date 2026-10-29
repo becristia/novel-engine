@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { captureLayouts } from './layout.js';
 
 test('creates a real workspace, previews and imports a manuscript, then reopens it', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
@@ -12,7 +13,7 @@ test('creates a real workspace, previews and imports a manuscript, then reopens 
   await expect(page.getByRole('cell', { name: '雨夜归港', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: '确认导入 3 章' })).toBeEnabled();
   await page.getByRole('button', { name: '关闭提示' }).click();
-  await page.screenshot({ path: '.tmp/ui-implementation/library.png', fullPage: true });
+  await captureLayouts(page, 'library');
   await page.getByRole('button', { name: '确认导入 3 章' }).click();
   await expect(page.getByRole('button', { name: '雾港来信 3 章正式稿' })).toBeVisible();
   await page.reload();

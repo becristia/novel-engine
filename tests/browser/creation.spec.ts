@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { captureLayouts } from './layout.js';
 
 test('plans, edits and approves three chapters, fixes a conflict and saves an author revision', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
@@ -18,14 +19,14 @@ test('plans, edits and approves three chapters, fixes a conflict and saves an au
   await page.getByRole('button', { name: '保存计划修改' }).click();
   await expect(page.getByRole('button', { name: '保存计划修改' })).toBeDisabled();
   if (await page.getByRole('button', { name: '关闭提示' }).count()) await page.getByRole('button', { name: '关闭提示' }).click();
-  await page.screenshot({ path: '.tmp/ui-implementation/planning.png', fullPage: true });
+  await captureLayouts(page, 'planning');
   await page.getByRole('button', { name: '批准本批 3 章' }).click();
   await page.getByRole('button', { name: '生成并审稿', exact: true }).click();
   await page.reload();
   await expect(page.getByRole('heading', { name: '伤势前后矛盾' })).toBeVisible();
   await expect(page.getByRole('button', { name: '批准为正式稿', exact: true })).toBeDisabled();
   if (await page.getByRole('button', { name: '关闭提示' }).count()) await page.getByRole('button', { name: '关闭提示' }).click();
-  await page.screenshot({ path: '.tmp/ui-implementation/chapters.png', fullPage: true });
+  await captureLayouts(page, 'chapters');
   await page.getByRole('button', { name: '定位原文', exact: true }).click();
   await expect(page.getByRole('dialog', { name: '原文证据' })).toContainText('受伤的右手');
   await page.getByRole('button', { name: '关闭对话框' }).click();
@@ -42,6 +43,8 @@ test('plans, edits and approves three chapters, fixes a conflict and saves an au
   }
   await page.getByRole('button', { name: '编辑正式稿', exact: true }).click();
   await page.getByRole('dialog').getByLabel('正文', { exact: true }).fill('作者补写的正式正文。');
+  page.once('dialog', dialog => void dialog.dismiss()); await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog').getByLabel('正文', { exact: true })).toHaveValue('作者补写的正式正文。');
   await page.getByRole('button', { name: '预览差异', exact: true }).click();
   await page.getByRole('button', { name: '保存为新版本', exact: true }).click();
   await expect(page.locator('.reading-paper')).toContainText('作者补写的正式正文。');

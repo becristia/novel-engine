@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { captureLayouts } from './layout.js';
 
 test('rebuilds, confirms and corrects sourced memory, previews actual context and invalidates on constraints', async ({ page }) => {
   const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
@@ -15,7 +16,7 @@ test('rebuilds, confirms and corrects sourced memory, previews actual context an
   await expect(page.locator('.memory-table tbody tr')).toHaveCount(2);
   await expect(page.getByText('当前条目未采用：尚未确认')).toBeVisible();
   if (await page.getByRole('button', { name: '关闭提示' }).count()) await page.getByRole('button', { name: '关闭提示' }).click();
-  await page.screenshot({ path: '.tmp/ui-implementation/memory.png', fullPage: true });
+  await captureLayouts(page, 'memory');
   await page.getByRole('button', { name: '定位原文', exact: true }).click(); await expect(page.getByRole('dialog')).toContainText('铜钥匙'); await page.getByRole('button', { name: '关闭对话框' }).click();
   await page.getByRole('button', { name: '确认这条信息', exact: true }).click();
   await expect(page.getByText('当前条目已采用', { exact: true })).toBeVisible();

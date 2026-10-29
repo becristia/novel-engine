@@ -25,7 +25,8 @@ export function ChaptersPage(props: PageProps) {
   const [source, setSource] = useState<Reference | null>(null);
   const [editor, setEditor] = useState<{ chapterId: string | null; title: string; content: string; original: string; version: number; preview: boolean } | null>(null);
   const [reviseOnce, setReviseOnce] = useState(false);
-  useUnsavedChanges(Boolean(editor && (editor.content !== editor.original || (!editor.chapterId && editor.title))));
+  const editorDirty = Boolean(editor && (editor.content !== editor.original || (!editor.chapterId && editor.title)));
+  useUnsavedChanges(editorDirty);
   useEffect(() => {
     const requested = candidates.find(item => item.revisionId === focus.revisionId);
     setCandidateId(requested?.revisionId ?? latest?.revisionId ?? candidates.at(-1)?.revisionId ?? '');
@@ -53,7 +54,7 @@ export function ChaptersPage(props: PageProps) {
     if (kind === 'revise' && revisionId) await job({ kind: 'revise', revisionId, instruction });
     notify('任务已启动，结果会自动显示。');
   };
-  const closeEditor = () => { if (!editor || editor.content === editor.original || window.confirm('有未保存的正文，确定放弃这次编辑吗？')) setEditor(null); };
+  const closeEditor = () => { if (!editorDirty || window.confirm('有未保存的正文，确定放弃这次编辑吗？')) setEditor(null); };
   const editDialog = editor && <Dialog title={editor.chapterId ? '编辑正式稿' : '新增正式章节'} onClose={closeEditor}>
     <Banner>保存会创建新的正式版本，相关派生记忆需要重新核对。</Banner>
     {!editor.chapterId && <Field label="章节标题"><input value={editor.title} onChange={e => setEditor({ ...editor, title: e.target.value })}/></Field>}
@@ -66,6 +67,7 @@ export function ChaptersPage(props: PageProps) {
   </Dialog>;
   if (!chapter) return <><PageHeader title="章节工作台"/><Empty title="还没有章节" detail="先批准章节计划，或直接添加自己的正文。"><div className="actions-row centered"><Button variant="primary" onClick={() => navigate('planning')}>前往规划</Button><Button onClick={() => setEditor({ chapterId: null, title: '', content: '', original: '', version: data.project.version, preview: false })}>新增章节</Button></div></Empty>{editDialog}</>;
   return <>
+    <div className="compact-chapters"><select aria-label="选择章节" value={chapter.id} onChange={event => navigate('chapters', { chapterId: event.target.value })}>{catalog.map(item => <option key={item.id} value={item.id}>第 {item.ordinal} 章 · {item.title}</option>)}</select><Button icon="plus" onClick={() => navigate('chapters', { createChapter: true })}>新增章节</Button></div>
     <div className="chapter-layout">
       <div className="reader-column">
         <header className="chapter-header"><p className="breadcrumb">{data.project.title} / 第 {chapter.ordinal} 章</p><div className="row-title"><h1>{chapter.title}</h1><div className="actions-row"><Button icon="clock" onClick={() => navigate('versions', { chapterId: chapter.id })}>查看历史</Button><Button variant="ghost" icon="export" onClick={() => navigate('versions')}>导出</Button></div></div></header>

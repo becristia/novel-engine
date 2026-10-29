@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 import { z } from 'zod';
 import { BookStore } from '../storage/book-store.js';
@@ -21,6 +21,9 @@ export class Library {
     const canonical = existsSync(resolved) ? realpathSync(resolved) : resolve(realpathSync(dirname(resolved)), basename(resolved));
     const path = relative(this.root, canonical);
     if (!path || path === '..' || path.startsWith(`..${sep}`) || isAbsolute(path)) throw new HttpError(403, 'outside-library', '工作区必须位于启动时指定的作品目录内。');
+    for (const file of ['novel.db', 'novel.db-wal', 'novel.db-shm', 'novel.db-journal']) {
+      if (lstatSync(resolve(canonical, file), { throwIfNoEntry: false })?.isSymbolicLink()) throw new HttpError(403, 'linked-database', '工作区数据库和日志文件不能使用符号链接。');
+    }
     return canonical;
   }
   path(id: string): string {

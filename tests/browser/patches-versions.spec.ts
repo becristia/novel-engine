@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { captureLayouts } from './layout.js';
 import type { Page } from '@playwright/test';
 import { readFile } from 'node:fs/promises';
 
@@ -32,7 +33,7 @@ test('previews actual groups, respects dependencies and locks, reviews each sele
   await page.getByLabel('差异章节').selectOption({ label: '第 1 章 · 封存的信' });
   await expect(page.locator('.diff-columns')).toContainText('锁定段落');
   if (await page.getByRole('button', { name: '关闭提示' }).count()) await page.getByRole('button', { name: '关闭提示' }).click();
-  await page.screenshot({ path: '.tmp/ui-implementation/patches.png', fullPage: true });
+  await captureLayouts(page, 'patches');
   await page.getByRole('button', { name: '生成所选候选', exact: true }).click();
   await expect(page.getByRole('button', { name: '批准所选方案', exact: true })).toBeDisabled();
   for (const number of [1, 2]) {
@@ -63,7 +64,7 @@ test('exports a selected historical snapshot, restores as a new version and reor
   await page.getByRole('button', { name: '查看作品版本 1', exact: true }).click();
   await expect(page.locator('.version-paper')).toContainText('就是失踪多年的父亲');
   if (await page.getByRole('button', { name: '关闭提示' }).count()) await page.getByRole('button', { name: '关闭提示' }).click();
-  await page.screenshot({ path: '.tmp/ui-implementation/versions.png', fullPage: true });
+  await captureLayouts(page, 'versions');
   const downloadPromise = page.waitForEvent('download'); await page.getByRole('button', { name: '导出版本 1', exact: true }).click();
   const download = await downloadPromise; const text = await readFile((await download.path())!, 'utf8');
   expect(download.suggestedFilename()).toBe('版本验收-v1.md'); expect(text).toContain('就是失踪多年的父亲'); expect(text).not.toContain('作者更新后的第一章');

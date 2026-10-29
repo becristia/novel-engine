@@ -14,7 +14,7 @@ import { PatchService } from '../proposals/patches.js';
 import { replayRun } from '../workflows/replay.js';
 
 export const MAX_BODY_BYTES = 12 * 1024 * 1024;
-const number = z.coerce.number().int().nonnegative();
+const versionSchema = z.string().regex(/^(0|[1-9]\d*)$/u).transform(Number).pipe(z.number().int().nonnegative());
 const openSchema = z.strictObject({ directory: z.string().trim().min(1).max(500), title: z.string().trim().min(1).max(200).optional() });
 const importSchema = z.strictObject({ filename: z.string().min(1).max(256).regex(/^[^/\\\u0000]+$/u), content: z.string().max(MAX_BODY_BYTES), apply: z.boolean(), expectedVersion: z.number().int().nonnegative() });
 export interface AppOptions { library: Library; origin: () => string; config: () => Promise<LoadedConfig>; transport?: TransportFactory }
@@ -59,7 +59,7 @@ export function createWorkbenchApp(options: AppOptions) {
         return json(useBook(id, input.apply, book => new CommitService(book).importBytes(bytes, `upload:${input.filename}`, input.apply, input.expectedVersion)));
       }
       if (resource === 'revisions' && parts[4] && method === 'GET') return json(useBook(id, false, book => revisionView(book, parts[4]!)));
-      if (resource === 'snapshot' && method === 'GET') return json(useBook(id, false, book => book.snapshot(number.parse(url.searchParams.get('version')))));
+      if (resource === 'snapshot' && method === 'GET') return json(useBook(id, false, book => book.snapshot(versionSchema.parse(url.searchParams.get('version')))));
       if (resource === 'context' && method === 'GET') {
         const config = await options.config(); const chapter = z.coerce.number().int().positive().parse(url.searchParams.get('chapter'));
         return json(useBook(id, false, book => buildContext(book, chapter, config.config)));
@@ -73,7 +73,7 @@ export function createWorkbenchApp(options: AppOptions) {
         if (!parts[5] && method === 'GET') return json(useBook(id, false, book => runView(book, parts[4]!)));
       }
       if (resource === 'export' && method === 'GET') {
-        const version = number.parse(url.searchParams.get('version')); const format = z.enum(['markdown', 'txt']).parse(url.searchParams.get('format'));
+        const version = versionSchema.parse(url.searchParams.get('version')); const format = z.enum(['markdown', 'txt']).parse(url.searchParams.get('format'));
         return useBook(id, false, book => new Response(new CommitService(book).exportText(version, format), {
           headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(`${book.project().title}-v${version}.${format === 'markdown' ? 'md' : 'txt'}`)}` },
         }));

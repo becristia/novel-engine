@@ -1,4 +1,4 @@
-import { cloneElement, isValidElement, useEffect, useId, useRef, useState } from 'react';
+import { cloneElement, isValidElement, useId, useLayoutEffect, useRef, useState } from 'react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { formatHumanText } from '../src/cli/format.js';
 
@@ -41,10 +41,20 @@ export function TagsInput({ value, onChange, disabled, id }: { value: string[]; 
 }
 export function Empty({ title, detail, children }: { title: string; detail?: string; children?: ReactNode }) { return <div className="empty-state"><Icon name="book" size={42}/><h2>{title}</h2>{detail && <p>{detail}</p>}{children}</div>; }
 export function Banner({ children, tone = 'amber' }: { children: ReactNode; tone?: 'amber' | 'red' | 'green' | 'neutral' }) { return <div className={`banner ${tone}`}><Icon name={tone === 'green' ? 'check' : 'warning'} size={21}/><div>{children}</div></div>; }
-export function Tabs({ items, value, onChange }: { items: { value: string; label: string; count?: number }[]; value: string; onChange: (value: string) => void }) { return <div className="tabs" role="tablist">{items.map(item => <button role="tab" type="button" aria-selected={item.value === value} key={item.value} className={item.value === value ? 'selected' : ''} onClick={() => onChange(item.value)}>{item.label}{item.count !== undefined && <small>{item.count}</small>}</button>)}</div>; }
+export function Tabs({ items, value, onChange }: { items: { value: string; label: string; count?: number }[]; value: string; onChange: (value: string) => void }) {
+  return <div className="tabs" role="tablist">{items.map((item, index) => <button role="tab" type="button" aria-selected={item.value === value} tabIndex={item.value === value ? 0 : -1} key={item.value} className={item.value === value ? 'selected' : ''} onClick={() => onChange(item.value)} onKeyDown={event => {
+    const next = event.key === 'ArrowRight' ? (index + 1) % items.length : event.key === 'ArrowLeft' ? (index + items.length - 1) % items.length : event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : null;
+    if (next === null) return;
+    event.preventDefault(); onChange(items[next]!.value); event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>('[role=tab]')[next]?.focus();
+  }}>{item.label}{item.count !== undefined && <small>{item.count}</small>}</button>)}</div>;
+}
 export function Dialog({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
   const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => { ref.current?.showModal(); }, []);
-  return <dialog ref={ref} className="dialog" onCancel={onClose} aria-label={title}><header><h2>{title}</h2><Button variant="ghost" icon="close" aria-label="关闭对话框" onClick={onClose}/></header>{children}</dialog>;
+  useLayoutEffect(() => {
+    const dialog = ref.current!; const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    dialog.showModal(); dialog.querySelector<HTMLElement>('input:not([disabled]), textarea:not([disabled]), select:not([disabled])')?.focus();
+    return () => { dialog.close(); if (trigger?.isConnected) trigger.focus(); };
+  }, []);
+  return <dialog ref={ref} className="dialog" onCancel={event => { event.preventDefault(); onClose(); }} aria-label={title}><header><h2>{title}</h2><Button variant="ghost" icon="close" aria-label="关闭对话框" onClick={onClose}/></header>{children}</dialog>;
 }
 export function ErrorText({ error }: { error: unknown }) { return <Banner tone="red">{error instanceof Error ? formatHumanText(error.message) : '无法读取内容，请重试。'}</Banner>; }

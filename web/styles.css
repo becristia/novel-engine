@@ -19,6 +19,7 @@ strong{font-weight:600}
 .numeric{text-align:right;font-variant-numeric:tabular-nums}
 .divider{height:1px;background:var(--line);margin:22px 0;flex-shrink:0}
 .app-shell{display:grid;grid-template-columns:224px minmax(0,1fr);height:100dvh;overflow:hidden}
+.compact-chapters{display:none}
 .sidebar{background:#203f35;color:#eff4ee;display:flex;flex-direction:column;min-height:0;overflow-y:auto;padding:24px 12px 28px}
 .brand{font:600 26px Georgia,"Times New Roman",serif;letter-spacing:.3px;text-decoration:none;color:#fff;white-space:nowrap;margin:0 12px 20px}
 .book-selector{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;color:#f5f7f2;background:#29493e;border:1px solid #4d6c5d;border-radius:5px;padding:12px;font-size:17px;text-align:left}
@@ -140,6 +141,8 @@ h1{font-size:34px}
 h2{font-size:23px}
 }
 @media(max-width:980px){.app-shell{grid-template-columns:76px minmax(0,1fr)}
+.compact-chapters{display:flex;gap:12px;margin-bottom:20px;align-items:center}
+.compact-chapters>select{flex:1;min-width:0}
 .brand{font-size:0;margin:0 8px 28px}
 .brand:after{content:'n.';font-size:32px}
 .book-selector span,.book-hint,.sidebar nav a span,.settings-link span{display:none}

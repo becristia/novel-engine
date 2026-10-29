@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { captureLayouts } from './layout.js';
 import { mkdir, mkdtemp, rm } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -17,7 +18,7 @@ test('checks models, preserves a task budget on unknown retry, replays and cance
   await page.getByRole('button', { name: '探测模型', exact: true }).click();
   await expect(page.getByText('探测通过', { exact: true })).toBeVisible();
   if (await page.getByRole('button', { name: '关闭提示' }).count()) await page.getByRole('button', { name: '关闭提示' }).click();
-  await page.screenshot({ path: '.tmp/ui-implementation/settings.png', fullPage: true });
+  await captureLayouts(page, 'settings');
   await page.getByRole('button', { name: '查看探测记录' }).click();
   await page.getByRole('button', { name: '只读重放', exact: true }).click();
   await expect(page.getByRole('dialog')).toContainText('数据库变更：0');
@@ -29,7 +30,7 @@ test('checks models, preserves a task budget on unknown retry, replays and cance
   await expect(page.getByRole('button', { name: '重试未知请求', exact: true })).toBeDisabled();
   await expect(page.locator('.run-details')).toContainText('未知');
   if (await page.getByRole('button', { name: '关闭提示' }).count()) await page.getByRole('button', { name: '关闭提示' }).click();
-  await page.screenshot({ path: '.tmp/ui-implementation/runs.png', fullPage: true });
+  await captureLayouts(page, 'runs');
   await page.getByLabel('我理解重试可能产生额外用量').check();
   await page.getByRole('button', { name: '重试未知请求', exact: true }).click();
   await expect(page.getByRole('button', { name: '查看待处理提案' })).toBeVisible();
