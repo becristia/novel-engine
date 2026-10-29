@@ -10,6 +10,7 @@ import { RequestFailure } from '../src/llm/request-failure.js';
 import type { TextTransport } from '../src/llm/sdk-provider.js';
 import type { ModelResult } from '../src/llm/model-gateway.js';
 import { BookStore } from '../src/storage/book-store.js';
+import { RunStore } from '../src/storage/run-store.js';
 import { createWorkspace } from '../src/application/workspace.js';
 import type { WorkspaceView } from '../src/application/workbench-query.js';
 
@@ -164,5 +165,16 @@ describe('local workbench boundary and workflows', () => {
     expect(response.status).toBe(200);
     const revision = await response.json() as { content: string; review: { status: string; payload: unknown } };
     expect(revision.content).toContain('保留可阅读候选'); expect(revision.review.status).toBe('failed'); expect(revision.review.payload).toBeNull();
+  });
+
+  it('reports an orphaned in-flight request as interrupted without mutating its saved status', async () => {
+    const book = new BookStore(library.path(id));
+    try {
+      const runs = new RunStore(book); const run = runs.create('probe', { configSource: 'builtin' }, config, budget);
+      runs.reserve(run.id, 'probe:v1', 'saved-hash', 'saved prompt', 128);
+    } finally { book.close(); }
+    const run = (await view()).runs[0]!;
+    expect(run.interrupted).toBe(true); expect(run.active).toBe(false); expect(run.hasUnknown).toBe(true);
+    expect(run.status).toBe('running'); expect(run.attempts[0]!.status).toBe('inflight');
   });
 });

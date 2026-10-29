@@ -1,4 +1,6 @@
 import type { LoadedConfig } from '../llm/config.js';
+import { hostname } from 'node:os';
+import { hash } from '../domain/workspace.js';
 import { BookStore } from '../storage/book-store.js';
 import { ProposalStore } from '../storage/proposal-store.js';
 import type { Proposal } from '../storage/proposal-store.js';
@@ -58,15 +60,24 @@ export function revisionView(book: BookStore, id: string) {
 
 export function runView(book: BookStore, id: string) {
   const runs = new RunStore(book); const run = runs.get(id);
+  const lease = book.db.prepare('SELECT run_id AS runId, expires_at AS expiresAt, pid, hostname FROM write_lease WHERE singleton = 1').get() as { runId: string; expiresAt: number; pid: number; hostname: string } | undefined;
+  let active = Boolean(lease?.runId === id && lease.expiresAt > Date.now());
+  if (active && lease?.hostname === hostname()) {
+    try { if (!Number.isSafeInteger(lease.pid) || lease.pid < 1) active = false; else process.kill(lease.pid, 0); }
+    catch (error) { if (error instanceof Error && 'code' in error && error.code === 'ESRCH') active = false; }
+  }
+  const interrupted = !active && ['queued', 'running'].includes(run.status);
+  const result = runs.artifact(id, 'result') as { proposalId?: string; revisionId?: string } | undefined;
   const attempts = runs.attempts(id).map(({ prompt: _prompt, raw: _raw, usage, ...attempt }) => ({ ...attempt, usage: usage ? JSON.parse(usage) as { inputTokens: number; outputTokens: number } : null }));
   const input = run.input as { chapter?: number; brief?: string; chapters?: number; sourceChapterId?: string; context?: { plan?: { title: string } } };
   return {
     id, kind: run.kind, status: run.status, baseVersion: run.baseVersion, cancelled: run.cancelled,
     error: run.error, budget: run.budget, chapter: input.chapter ?? null, title: input.context?.plan?.title ?? null, brief: input.brief ?? null, chapters: input.chapters ?? null,
-    sourceChapterId: input.sourceChapterId ?? null, modelId: run.config.model.modelId, attempts,
+    sourceChapterId: input.sourceChapterId ?? null, modelId: run.config.model.modelId, configurationHash: hash(JSON.stringify(run.config.model)), attempts,
+    active, interrupted, proposalId: typeof result?.proposalId === 'string' ? result.proposalId : null,
     reservedTokens: attempts.reduce((sum, item) => sum + (item.usage ? item.usage.inputTokens + item.usage.outputTokens : item.reservedTokens), 0),
     estimatedCost: attempts.length && attempts.every(item => item.estimatedCost !== null) ? attempts.reduce((sum, item) => sum + item.estimatedCost!, 0) : null,
-    hasUnknown: attempts.some(item => item.status === 'unknown' || (item.status === 'inflight' && run.status !== 'running')),
+    hasUnknown: attempts.some(item => item.status === 'unknown' || (item.status === 'inflight' && (run.status !== 'running' || interrupted))),
   };
 }
 
@@ -93,6 +104,7 @@ export function configurationView(loaded: LoadedConfig) {
   const credentialAvailable = model.provider === 'fake' || Boolean(process.env[model.apiKeyEnv]);
   return {
     source: loaded.source, provider: model.provider, modelId: model.modelId,
+    configurationHash: hash(JSON.stringify(model)),
     baseURL: model.provider === 'openai-compatible' ? model.baseURL : null,
     apiKeyEnv: model.provider === 'openai-compatible' ? model.apiKeyEnv : null,
     credentialAvailable, hasFakeResponses: model.provider === 'fake' && Boolean(model.responsesFile), prices: model.prices ?? null,

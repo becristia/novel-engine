@@ -4,6 +4,9 @@ import { Library } from '../../src/server/library.js';
 import { createHttpServer } from '../../src/server/http.js';
 import { defaultConfig } from '../../src/domain/model-config.js';
 import type { ModelRequest } from '../../src/llm/model-gateway.js';
+import { RequestFailure } from '../../src/llm/request-failure.js';
+
+const unknownPrompts = new Set<string>();
 
 // This deterministic transport is only a browser-test fixture; it never constructs
 // a real provider. Source IDs are read from the exact prompt sent by the core.
@@ -37,7 +40,8 @@ const directory = await mkdtemp(resolve('.tmp/ui-implementation/browser-'));
 const config = defaultConfig(); config.model.maxOutputTokens = 2048; config.model.contextWindowTokens = 32000;
 if (config.model.provider === 'fake') config.model.responsesFile = 'browser-test-fixture';
 const service = createHttpServer({ library: new Library(directory), config: async () => ({ config, source: 'builtin' }), staticDirectory: resolve('dist/web'), transport: async () => ({ generateText: async request => {
-  await new Promise(resolveWait => setTimeout(resolveWait, 120));
+  await new Promise(resolveWait => setTimeout(resolveWait, request.prompt.includes('取消验收') ? 2200 : 120));
+  if (request.prompt.includes('未知请求验收') && !unknownPrompts.has(request.prompt)) { unknownPrompts.add(request.prompt); throw new RequestFailure('unknown', false, 'fixture-disconnect'); }
   return { value: fixtureResponse(request), modelId: 'fake-v1', usage: null };
 } }) });
 await service.listen(3918);

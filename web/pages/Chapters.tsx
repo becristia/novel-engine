@@ -40,7 +40,7 @@ export function ChaptersPage(props: PageProps) {
   const reference = issue?.evidence.find(item => item.revisionId === revisionId);
   const candidate = mode === 'candidate' ? selected?.proposal : null;
   const editableCandidate = candidate?.status === 'pending' && !candidate.stale && !data.runs.find(run => run.id === candidate.runId)?.cancelled;
-  const activeModel = data.runs.some(run => ['queued', 'running'].includes(run.status));
+  const activeModel = data.runs.some(run => run.active);
   const canModel = modelReady(config) && !activeModel && !busy;
   const chapterLocks = data.snapshot.state.locks.filter(lock => lock.chapterId === chapter?.id);
   const previousMissing = chapter?.plan && Object.values(data.snapshot.state.plans).some(plan => plan.ordinal < chapter.plan!.ordinal && !data.snapshot.state.chapters.some(item => item.id === plan.chapterId));

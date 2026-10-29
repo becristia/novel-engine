@@ -293,3 +293,74 @@ th,td{padding:12px}
 .inspector-body{flex:1;overflow-y:auto}
 @media(max-width:1200px){.inspector{height:auto;position:static}.inspector-body{overflow:visible}}
 @media(max-width:700px){.plan-editor>.field,.plan-editor .field-row>.field{display:flex;gap:10px}.plan-editor .field-label{padding-top:0!important}}
+/* Tasks and model configuration */
+.filter-tabs>.tabs{display:inline-flex;background:#f0f2ec;border:1px solid var(--line);border-radius:6px;margin-bottom:18px;overflow:hidden}
+.filter-tabs>.tabs button{padding:13px 28px;border:0;font-size:17px}
+.filter-tabs>.tabs button.selected{background:var(--green);color:white}
+.runs-layout{display:grid;grid-template-columns:minmax(340px,.61fr) minmax(550px,1fr);gap:12px;min-height:calc(100dvh - 210px)}
+.run-list{padding:16px}
+.search-box{display:flex;align-items:center;gap:14px;border:1px solid var(--line);border-radius:6px;background:white;padding:0 16px;min-height:48px;margin-bottom:18px;color:#465b49}
+.search-box input:not([type=checkbox]):not([type=radio]):not([type=file]){border:0;padding:10px 0;min-height:46px;outline-offset:0;background:transparent}
+.run-row{width:100%;display:flex;align-items:center;gap:18px;padding:20px 16px;border:1px solid var(--line);border-radius:6px;background:white;color:inherit;text-align:left}
+.run-row.selected{background:#eef5ed;border-left:3px solid var(--green);padding-left:14px}
+.run-row>span:not(.badge){display:flex;flex:1;min-width:0;flex-direction:column;gap:9px}
+.run-row strong{font-size:18px;line-height:1.5}
+.run-row small{color:#7e887b;font-size:14px}
+.run-row .badge{font-size:13px;padding:6px 9px}
+.run-details{padding:22px 18px}
+.run-details>h2{margin-bottom:18px}
+.run-details>.banner{margin-bottom:16px}
+.run-details>.banner p{margin:4px 0 0}
+.run-detail-grid{display:grid;grid-template-columns:1fr 1.05fr;gap:12px;margin:14px 0}
+.detail-box{border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.detail-box>h3{font-size:17px;background:#fafbf7;border-bottom:1px solid var(--line);padding:16px 18px;margin:0}
+.step-list{list-style:none;margin:0;padding:20px 26px}
+.step-list li{position:relative;display:flex;gap:24px;min-height:67px}
+.step-list li:not(:last-child):after{content:'';position:absolute;width:1px;height:34px;left:12px;top:28px;background:#ced8c8}
+.step-list li:last-child{min-height:48px}
+.step-symbol{border:1px solid #a9b6a5;border-radius:50%;width:25px;height:25px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#7b8775;background:white;font-size:15px}
+.step-symbol.done{background:var(--green);border-color:var(--green);color:white}
+.step-symbol.attention{background:#d49421;border-color:#d49421;color:white}
+.step-list strong{font-size:16px;font-weight:500}
+.step-list small{display:block;color:#8b9286;margin-top:7px;font-size:14px}
+.key-values{padding:0 22px;margin:0}
+.key-values>div{display:flex;justify-content:space-between;align-items:flex-start;gap:15px;border-bottom:1px solid var(--line);padding:20px 0;line-height:1.6}
+.key-values>div:last-child{border:0}
+.key-values dt{white-space:nowrap}
+.key-values dd{margin:0;text-align:right;font-variant-numeric:tabular-nums}
+.key-values small{display:block;color:var(--muted);font-size:13px;margin-top:7px}
+.artifact-row{display:flex;align-items:center;gap:16px;padding:12px 17px;border:1px solid var(--line);border-radius:5px;font-size:15px;margin:14px 0}
+.artifact-row>span{flex:1}
+.recovery{padding:16px 18px;border:1px solid var(--line);border-radius:6px}
+.recovery h3{font-size:18px;margin-bottom:8px}
+.recovery>p{margin-bottom:10px}
+.recovery>.actions-row{margin:12px 0}
+.recovery .button.primary{min-width:250px}
+.replay-row{border-top:1px solid var(--line);padding-top:12px;margin-top:12px;display:flex;align-items:center;gap:16px}
+.replay-row .button{min-height:38px;padding:7px 20px;font-size:14px}
+.request-details{margin:16px 0 0;font-size:14px}
+.request-details summary{cursor:pointer;color:#74816c}
+.replay-check{display:flex;align-items:center;gap:12px;line-height:1.7;font-size:15px}
+.settings-layout{display:grid;grid-template-columns:1.52fr 1fr;gap:18px;align-items:start}
+.settings-layout .stack{gap:20px}
+.model-panel,.budget-panel,.offline-panel,.probe-panel{padding:26px}
+.model-values{border:1px solid var(--line);border-radius:5px;margin:0;padding:0 20px}
+.model-values>div{display:grid;grid-template-columns:165px minmax(0,1fr);gap:24px;padding:20px 0;min-height:60px;border-bottom:1px solid var(--line);font-size:17px;line-height:1.5}
+.model-values>div:last-child{border:0}
+.model-values dd{margin:0;overflow-wrap:anywhere;display:flex;gap:15px;align-items:center;justify-content:space-between}
+.model-values dd .badge{flex-shrink:0}
+.model-panel>.help-text{margin:16px 0 0}
+.budget-panel .row-title{margin:0 0 18px;align-items:flex-start}
+.budget-panel .row-title>p{margin:0}
+.budget-panel .row-title>.button{font-size:13px;padding:5px 12px;min-height:32px}
+.budget-panel>.banner{margin-top:14px}
+.check-values{border:1px solid var(--line);border-radius:6px;margin:0;padding:8px 20px}
+.check-values>div{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:20px 0;line-height:1.6}
+.check-values dd{margin:0;display:flex;align-items:center;gap:16px}
+.success-text{color:#326c50}.attention-text{color:var(--amber)}
+.offline-panel .button{margin-top:24px}
+.offline-panel .help-text{margin:6px 0 0}
+.probe-panel .wide{margin:14px 0 20px}
+@media(max-width:1250px){.runs-layout{grid-template-columns:minmax(270px,.55fr) minmax(440px,1fr)}.run-row{gap:12px;flex-wrap:wrap}.run-row strong{font-size:16px}.run-row>.badge{margin-left:40px}.model-values>div{grid-template-columns:115px minmax(0,1fr);gap:14px;font-size:15px}.check-values>div{flex-wrap:wrap}.settings-layout{grid-template-columns:1.3fr 1fr}.settings-layout .panel{padding:20px}.key-values{padding:0 16px}.step-list{padding:18px}.step-list li{gap:14px}}
+@media(max-width:1000px){.runs-layout{grid-template-columns:1fr}.run-list .stack{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}.settings-layout{grid-template-columns:1fr}.filter-tabs>.tabs button{padding:12px 20px}}
+@media(max-width:650px){.run-detail-grid{grid-template-columns:1fr}.run-list .stack{display:flex}.replay-row{flex-wrap:wrap}.recovery .button.primary{min-width:0;flex:1}.run-details{padding:15px}.model-values{padding:0 12px}.model-values>div{grid-template-columns:90px minmax(0,1fr)}.model-values dd{flex-wrap:wrap}.filter-tabs>.tabs button{padding:12px 15px;font-size:15px}}

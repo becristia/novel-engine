@@ -4,6 +4,8 @@ import { Banner, Button, Empty, Icon, PageHeader } from './components.js';
 import { LibraryPage } from './pages/Library.js';
 import { PlanningPage } from './pages/Planning.js';
 import { ChaptersPage } from './pages/Chapters.js';
+import { RunsPage } from './pages/Runs.js';
+import { SettingsPage } from './pages/Settings.js';
 import { chapterCatalog, chapterCandidates, chapterStatus } from './chapters.js';
 import { allowNavigation } from './hooks.js';
 import { pageNames, workspacePath } from './model.js';
@@ -45,9 +47,9 @@ export function App() {
     const value = await api.post<T>(workspacePath(data.project.id, 'actions'), { ...input, ...(input.action === 'cancel' ? {} : { expectedVersion }) });
     await refresh(); return value;
   });
-  const job = (input: JobInput) => perform(async () => {
+  const job = (input: JobInput, requestBudget = budget) => perform(async () => {
     if (!data) throw new Error('请先选择作品。');
-    const value = await api.post<{ runId: string | null }>(workspacePath(data.project.id, 'jobs'), { ...input, expectedVersion: data.project.version, requestId: crypto.randomUUID(), budget });
+    const value = await api.post<{ runId: string | null }>(workspacePath(data.project.id, 'jobs'), { ...input, expectedVersion: data.project.version, requestId: crypto.randomUUID(), budget: requestBudget });
     await refresh(); return value;
   });
   useEffect(() => {
@@ -64,7 +66,7 @@ export function App() {
     const listener = () => { const next = initialPage(); if (next !== currentPage.current && !allowNavigation()) { history.replaceState(null, '', `#/${currentPage.current}`); return; } setPage(next); };
     window.addEventListener('hashchange', listener); return () => window.removeEventListener('hashchange', listener);
   }, []);
-  const running = Boolean(data?.runs.some(run => ['running', 'queued'].includes(run.status)));
+  const running = Boolean(data?.runs.some(run => run.active));
   useEffect(() => { if (!running) return; const timer = setInterval(() => { void refresh().catch(error => notify(error.message, true)); }, 1500); return () => clearInterval(timer); }, [running, refresh, notify]);
   const props: PageProps | null = data ? { data, config, busy, budget, setBudget, focus, navigate, refresh, refreshConfig, notify, perform, action, job } : null;
   const chapters = data ? chapterCatalog(data) : [];
@@ -76,7 +78,7 @@ export function App() {
       <a className={`settings-link ${page === 'settings' ? 'active' : ''}`} href="#/settings" onClick={e => { e.preventDefault(); navigate('settings'); }}><Icon name="settings"/><span>模型与设置</span></a>
     </aside>
     <main className="main" data-page={page}><div className="app-caption">本地工作台</div>{notice && <div className="notice" role={notice.error ? 'alert' : 'status'}><Banner tone={notice.error ? 'red' : 'green'}>{notice.text}</Banner><Button variant="ghost" icon="close" aria-label="关闭提示" onClick={() => setNotice(null)}/></div>}
-      {page === 'books' ? <LibraryPage entries={entries} selected={workspace} onSelect={select} refresh={refresh} busy={busy} perform={perform} notify={notify}/> : page === 'planning' && props ? <PlanningPage {...props}/> : page === 'chapters' && props ? <ChaptersPage {...props}/> : <><PageHeader title={pageNames[page]}/><Empty title={data ? '准备开始创作' : '选择一部作品'} detail={data ? '当前作品的创作内容将在这里显示。' : '打开已有作品，或导入自己的稿件。'}><Button variant="primary" onClick={() => navigate('books')}>打开作品入口</Button></Empty></>}
+      {page === 'books' ? <LibraryPage entries={entries} selected={workspace} onSelect={select} refresh={refresh} busy={busy} perform={perform} notify={notify}/> : page === 'planning' && props ? <PlanningPage {...props}/> : page === 'chapters' && props ? <ChaptersPage {...props}/> : page === 'runs' && props ? <RunsPage {...props}/> : page === 'settings' ? <SettingsPage config={config} data={data} budget={budget} setBudget={setBudget} busy={busy} perform={perform} refreshConfig={refreshConfig} notify={notify} job={job} navigate={navigate}/> : <><PageHeader title={pageNames[page]}/><Empty title={data ? '准备开始创作' : '选择一部作品'} detail={data ? '当前作品的创作内容将在这里显示。' : '打开已有作品，或导入自己的稿件。'}><Button variant="primary" onClick={() => navigate('books')}>打开作品入口</Button></Empty></>}
     </main>
   </div>;
 }

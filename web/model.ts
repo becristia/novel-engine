@@ -23,7 +23,7 @@ export interface PageProps {
   notify: (text: string, error?: boolean) => void;
   perform: <T>(operation: () => Promise<T>) => Promise<T>;
   action: <T = unknown>(input: ActionInput, expectedVersion?: number) => Promise<T>;
-  job: (input: JobInput) => Promise<{ runId: string | null }>;
+  job: (input: JobInput, budget?: Budget) => Promise<{ runId: string | null }>;
 }
 export function workspacePath(id: string, resource = ''): string { return `/workspaces/${encodeURIComponent(id)}${resource ? `/${resource}` : ''}`; }
-export function modelReady(config: ConfigurationView | null): boolean { return Boolean(config?.credentialAvailable && (config.provider !== 'fake' || config.hasFakeResponses)); }
+export function modelReady(config: ConfigurationView | null): boolean { return Boolean(config?.offlineOk && config.credentialAvailable && (config.provider !== 'fake' || config.hasFakeResponses)); }

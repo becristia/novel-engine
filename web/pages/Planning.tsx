@@ -19,11 +19,12 @@ export function PlanningPage(props: PageProps) {
   const [form, setForm] = useState<ReturnType<typeof toForm> | null>(plan ? toForm(plan) : null);
   const [generate, setGenerate] = useState(false); const [brief, setBrief] = useState(''); const [count, setCount] = useState('3');
   useEffect(() => { if (latest?.id) setSelected(latest.id); }, [latest?.id]);
+  useEffect(() => { if (props.focus.proposalId) setSelected(props.focus.proposalId); }, [props.focus.proposalId]);
   useEffect(() => { if (plan) setForm(toForm(plan)); }, [batch?.id, plan?.chapterId, plan?.revisionId]);
   const editable = batch?.status === 'pending' && !batch.stale;
   const dirty = Boolean(form && plan && JSON.stringify(form) !== JSON.stringify(toForm(plan)));
   useUnsavedChanges(dirty);
-  const active = busy || data.runs.some(run => ['running', 'queued'].includes(run.status));
+  const active = busy || data.runs.some(run => run.active);
   const ready = modelReady(config) && !active;
   const run = batch ? data.runs.find(item => item.id === batch.runId) : undefined;
   const submitPlan = async () => {
