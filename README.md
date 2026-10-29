@@ -16,6 +16,16 @@ npm run novel -- doctor --offline
 
 依赖安装需要访问 npm。CLI 离线检查和普通测试不调用模型；测试环境同时禁止 `fetch` 和 Socket 网络连接。
 
+## 本地工作台
+
+```bash
+npm run web -- --library ./books
+```
+
+服务仅监听本机，启动后打开终端显示的地址，默认是 http://127.0.0.1:3917 。作品入口支持新建作品、登记已有工作区、上传 Markdown／TXT 稿件、预览拆章和确认导入。填写的作品文件夹必须位于 `--library` 指定目录内；不会自动扫描其他目录。上传上限为 8 MiB，先预览再写入，原始字节由核心保留。
+
+可用 `--project ./books/demo` 登记已有工作区，`--config ./novel.config.json` 显式指定模型配置，`--port 3919` 更换端口。模型配置和密钥在本地服务读取，前端只收到脱敏信息。完成构建后也可运行 `node dist/server/main.js --library ./books`。
+
 ## 配置检查
 
 不传 `--config` 时，doctor 校验内置的 FakeProvider 配置。它不会自动读取当前目录的配置文件。
@@ -180,7 +190,9 @@ node dist/cli/main.js doctor --offline
 node dist/cli/main.js doctor --offline --json
 ```
 
-`check` 执行类型检查；测试覆盖配置失败与脱敏、结构化响应、取消、CLI 退出码、中文展示以及模块导入无自动执行行为。`build` 将源码编译到 `dist/`；该目录为可重建产物，不纳入 Git。
+`check` 检查核心与浏览器 TypeScript；测试覆盖配置失败与脱敏、结构化响应、取消、CLI、本地接口与工作流。`build` 编译核心与服务端到 `dist/`，同时将浏览器页面构建到 `dist/web/`，生成产物不纳入 Git。
+
+`npm run test:web` 在独立临时工作区运行浏览器验收，不调用真实供应商；先执行 `npm run build`。macOS 存在 Google Chrome 时直接使用，否则使用 Playwright Chromium，首次使用可运行 `npx playwright install chromium`。测试截图、trace 和临时数据库位于 `.tmp/ui-implementation/`。
 
 ## 文档入口
 
