@@ -1,0 +1,54 @@
+import { test, expect } from '@playwright/test';
+
+test('plans, edits and approves three chapters, fixes a conflict and saves an author revision', async ({ page }) => {
+  const errors: string[] = []; page.on('pageerror', error => errors.push(error.message));
+  await page.goto('/');
+  await page.getByRole('button', { name: '新建作品', exact: true }).click();
+  await page.getByLabel('作品名称').fill('创作闭环验收'); await page.getByLabel('作品文件夹').fill('creation-flow');
+  await page.getByRole('button', { name: '创建作品', exact: true }).click();
+  await expect(page.getByRole('dialog')).not.toBeVisible();
+  await page.getByRole('link', { name: '规划', exact: true }).click();
+  await page.getByLabel('创作要求', { exact: true }).fill('围绕失踪航次展开调查，保留林舟的有限视角。');
+  await page.getByRole('button', { name: '生成计划', exact: true }).click();
+  await expect(page.getByLabel('章节标题')).toHaveValue('雨夜归港');
+  await page.getByLabel('本章目标').fill('从旧信中发现新的线索，决定前往灯塔。');
+  page.once('dialog', dialog => void dialog.dismiss());
+  await page.getByRole('link', { name: '任务记录', exact: true }).click();
+  await expect(page.getByLabel('本章目标')).toHaveValue('从旧信中发现新的线索，决定前往灯塔。');
+  await page.getByRole('button', { name: '保存计划修改' }).click();
+  await expect(page.getByRole('button', { name: '保存计划修改' })).toBeDisabled();
+  if (await page.getByRole('button', { name: '关闭提示' }).count()) await page.getByRole('button', { name: '关闭提示' }).click();
+  await page.screenshot({ path: '.tmp/ui-implementation/planning.png', fullPage: true });
+  await page.getByRole('button', { name: '批准本批 3 章' }).click();
+  await page.getByRole('button', { name: '生成并审稿', exact: true }).click();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: '伤势前后矛盾' })).toBeVisible();
+  await expect(page.getByRole('button', { name: '批准为正式稿', exact: true })).toBeDisabled();
+  if (await page.getByRole('button', { name: '关闭提示' }).count()) await page.getByRole('button', { name: '关闭提示' }).click();
+  await page.screenshot({ path: '.tmp/ui-implementation/chapters.png', fullPage: true });
+  await page.getByRole('button', { name: '定位原文', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: '原文证据' })).toContainText('受伤的右手');
+  await page.getByRole('button', { name: '关闭对话框' }).click();
+  await page.getByLabel('修订要求', { exact: true }).fill('改用左手记录。');
+  await page.getByRole('button', { name: '修订候选稿', exact: true }).click();
+  await expect(page.getByRole('button', { name: '批准为正式稿', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: '批准为正式稿', exact: true }).click();
+  await expect(page.getByText('当前正式稿', { exact: true })).toBeVisible();
+  for (const title of ['封存的信', '旧伤']) {
+    await page.locator('.sidebar-chapters>button').filter({ hasText: title }).click();
+    await page.getByRole('button', { name: '生成并审稿', exact: true }).click();
+    await expect(page.getByRole('button', { name: '批准为正式稿', exact: true })).toBeEnabled();
+    await page.getByRole('button', { name: '批准为正式稿', exact: true }).click();
+  }
+  await page.getByRole('button', { name: '编辑正式稿', exact: true }).click();
+  await page.getByRole('dialog').getByLabel('正文', { exact: true }).fill('作者补写的正式正文。');
+  await page.getByRole('button', { name: '预览差异', exact: true }).click();
+  await page.getByRole('button', { name: '保存为新版本', exact: true }).click();
+  await expect(page.locator('.reading-paper')).toContainText('作者补写的正式正文。');
+  const id = await page.evaluate(() => localStorage.getItem('novel-workspace'));
+  const session = await (await page.request.get('/api/session')).json() as { token: string };
+  const result = await (await page.request.get(`/api/workspaces/${id}`, { headers: { 'x-novel-token': session.token } })).json() as { snapshot: { state: { chapters: unknown[] } }; runs: { kind: string; attempts: unknown[] }[] };
+  expect(result.snapshot.state.chapters).toHaveLength(3);
+  expect(result.runs.filter(run => run.kind === 'write')).toHaveLength(3);
+  expect(errors).toEqual([]);
+});

@@ -15,10 +15,11 @@ import { publicError } from './workbench-errors.js';
 
 export function approvalState(book: BookStore, proposal: Proposal) {
   let requiresReason = false;
+  let blockedCode = 'needs-review';
   try {
-    if (proposal.status !== 'pending') throw new Error('提案已经处理，不能再次批准。');
-    if (proposal.baseVersion !== book.project().version) throw new Error('候选基线已过期，请重新准备。');
-    if (new RunStore(book).get(proposal.runId).cancelled) throw new Error('运行已取消，不能批准。');
+    if (proposal.status !== 'pending') { blockedCode = 'processed'; throw new Error('提案已经处理，不能再次批准。'); }
+    if (proposal.baseVersion !== book.project().version) { blockedCode = 'stale'; throw new Error('候选基线已过期，请重新准备。'); }
+    if (new RunStore(book).get(proposal.runId).cancelled) { blockedCode = 'cancelled'; throw new Error('运行已取消，不能批准。'); }
     if (proposal.kind === 'patch') throw new Error('需要先选择修改组并生成候选。');
     if (proposal.kind !== 'plan') {
       const state = book.snapshot().state;
@@ -37,12 +38,12 @@ export function approvalState(book: BookStore, proposal: Proposal) {
       for (const id of revisions) {
         const reports = new ReviewStore(book).approvedReports(id, proposal.baseVersion);
         validateReview(book, reports.review, allowed); validateExtraction(book, reports.extraction, id);
-        if (reports.review.issues.some(issue => issue.kind === 'conflict')) throw new Error('存在确定冲突，请修订并重新审稿。');
+        if (reports.review.issues.some(issue => issue.kind === 'conflict')) { blockedCode = 'conflict'; throw new Error('存在确定冲突，请修订并重新审稿。'); }
         requiresReason ||= reports.review.issues.length > 0;
       }
     }
-    return { canApprove: true, requiresReason, blockedReason: null };
-  } catch (error) { return { canApprove: false, requiresReason, blockedReason: publicError(error).message }; }
+    return { canApprove: true, requiresReason, blockedReason: null, blockedCode: null };
+  } catch (error) { return { canApprove: false, requiresReason, blockedReason: publicError(error).message, blockedCode }; }
 }
 
 export function revisionView(book: BookStore, id: string) {
@@ -50,18 +51,18 @@ export function revisionView(book: BookStore, id: string) {
   const review = reports.latest('reviews', id); const extraction = reports.latest('extractions', id);
   return {
     ...revision, blocks: blocks(revision.content),
-    review: review ? { ...review, payload: ReviewSchema.parse(JSON.parse(review.payload)) } : null,
-    extraction: extraction ? { ...extraction, payload: ExtractionSchema.parse(JSON.parse(extraction.payload)) } : null,
+    review: review ? { ...review, payload: review.status === 'reviewed' ? ReviewSchema.parse(JSON.parse(review.payload)) : null } : null,
+    extraction: extraction ? { ...extraction, payload: extraction.status === 'extracted' ? ExtractionSchema.parse(JSON.parse(extraction.payload)) : null } : null,
   };
 }
 
 export function runView(book: BookStore, id: string) {
   const runs = new RunStore(book); const run = runs.get(id);
   const attempts = runs.attempts(id).map(({ prompt: _prompt, raw: _raw, usage, ...attempt }) => ({ ...attempt, usage: usage ? JSON.parse(usage) as { inputTokens: number; outputTokens: number } : null }));
-  const input = run.input as { chapter?: number; sourceChapterId?: string; context?: { plan?: { title: string } } };
+  const input = run.input as { chapter?: number; brief?: string; chapters?: number; sourceChapterId?: string; context?: { plan?: { title: string } } };
   return {
     id, kind: run.kind, status: run.status, baseVersion: run.baseVersion, cancelled: run.cancelled,
-    error: run.error, budget: run.budget, chapter: input.chapter ?? null, title: input.context?.plan?.title ?? null,
+    error: run.error, budget: run.budget, chapter: input.chapter ?? null, title: input.context?.plan?.title ?? null, brief: input.brief ?? null, chapters: input.chapters ?? null,
     sourceChapterId: input.sourceChapterId ?? null, modelId: run.config.model.modelId, attempts,
     reservedTokens: attempts.reduce((sum, item) => sum + (item.usage ? item.usage.inputTokens + item.usage.outputTokens : item.reservedTokens), 0),
     estimatedCost: attempts.length && attempts.every(item => item.estimatedCost !== null) ? attempts.reduce((sum, item) => sum + item.estimatedCost!, 0) : null,
@@ -94,7 +95,7 @@ export function configurationView(loaded: LoadedConfig) {
     source: loaded.source, provider: model.provider, modelId: model.modelId,
     baseURL: model.provider === 'openai-compatible' ? model.baseURL : null,
     apiKeyEnv: model.provider === 'openai-compatible' ? model.apiKeyEnv : null,
-    credentialAvailable, prices: model.prices ?? null,
+    credentialAvailable, hasFakeResponses: model.provider === 'fake' && Boolean(model.responsesFile), prices: model.prices ?? null,
     maxOutputTokens: model.maxOutputTokens, contextWindowTokens: model.contextWindowTokens,
     nodeVersion: process.versions.node, offlineOk: isSupportedNode(process.versions.node),
   };

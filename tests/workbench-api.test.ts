@@ -153,4 +153,16 @@ describe('local workbench boundary and workflows', () => {
     expect(current.runs[0]!.status).toBe('awaiting_approval');
     expect((await view()).project.version).toBe(1); expect(factory).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps a candidate readable when a model review fails validation', async () => {
+    scripts.push([JSON.stringify({ chapters: [chapterPlan] })]); await job({ kind: 'plan', brief: '写一章。', chapters: 1 });
+    const planned = await view();
+    await action({ action: 'approve', proposalId: planned.proposals[0]!.id, expectedVersion: 0 });
+    scripts.push(['保留可阅读候选。', 'invalid-json', 'invalid-json']); await job({ kind: 'write', chapter: 1 });
+    const current = await view(); const draft = current.proposals.at(-1)!.payload as { revisionId: string };
+    const response = await call(`/workspaces/${id}/revisions/${draft.revisionId}`);
+    expect(response.status).toBe(200);
+    const revision = await response.json() as { content: string; review: { status: string; payload: unknown } };
+    expect(revision.content).toContain('保留可阅读候选'); expect(revision.review.status).toBe('failed'); expect(revision.review.payload).toBeNull();
+  });
 });

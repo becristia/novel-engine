@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { cloneElement, isValidElement, useEffect, useId, useRef, useState } from 'react';
 import type { ButtonHTMLAttributes, ReactNode } from 'react';
 import { formatHumanText } from '../src/cli/format.js';
 
@@ -28,7 +28,17 @@ export function Button({ children, variant = 'secondary', icon, ...props }: Butt
 export function Badge({ children, tone = 'neutral' }: { children: ReactNode; tone?: 'neutral' | 'green' | 'amber' | 'red' }) { return <span className={`badge ${tone}`}>{children}</span>; }
 export function PageHeader({ title, subtitle, actions }: { title: string; subtitle?: string; actions?: ReactNode }) { return <header className="page-header"><div><h1>{title}</h1>{subtitle && <p>{subtitle}</p>}</div><div className="header-actions">{actions}</div></header>; }
 export function Panel({ title, children, className = '' }: { title?: string; children: ReactNode; className?: string }) { return <section className={`panel ${className}`}>{title && <h2>{title}</h2>}{children}</section>; }
-export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) { return <label className="field"><span className="field-label">{formatHumanText(label)}</span>{children}{hint && <small>{hint}</small>}</label>; }
+export function Field({ label, children, hint }: { label: string; children: ReactNode; hint?: string }) {
+  const generated = useId();
+  const control = isValidElement<{ id?: string; 'aria-describedby'?: string }>(children) ? children : null;
+  const id = control?.props.id ?? generated;
+  return <div className="field"><label className="field-label" htmlFor={id}>{formatHumanText(label)}</label>{control ? cloneElement(control, { id, ...(hint ? { 'aria-describedby': `${id}-hint` } : {}) }) : children}{hint && <small id={`${id}-hint`}>{hint}</small>}</div>;
+}
+export function TagsInput({ value, onChange, disabled, id }: { value: string[]; onChange: (value: string[]) => void; disabled?: boolean; id?: string }) {
+  const [draft, setDraft] = useState('');
+  const add = () => { const next = draft.split(/[，,]/u).map(s => s.trim()).filter(Boolean); if (next.length) onChange([...new Set([...value, ...next])]); setDraft(''); };
+  return <div className={`tags-input ${disabled ? 'disabled' : ''}`}>{value.map(item => <span key={item}>{item}{!disabled && <button type="button" aria-label={`移除人物 ${item}`} onClick={() => onChange(value.filter(v => v !== item))}><Icon name="close" size={13}/></button>}</span>)}<input id={id} disabled={disabled} value={draft} placeholder={disabled ? '' : '添加人物'} onChange={e => setDraft(e.target.value)} onBlur={add} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); add(); } }}/></div>;
+}
 export function Empty({ title, detail, children }: { title: string; detail?: string; children?: ReactNode }) { return <div className="empty-state"><Icon name="book" size={42}/><h2>{title}</h2>{detail && <p>{detail}</p>}{children}</div>; }
 export function Banner({ children, tone = 'amber' }: { children: ReactNode; tone?: 'amber' | 'red' | 'green' | 'neutral' }) { return <div className={`banner ${tone}`}><Icon name={tone === 'green' ? 'check' : 'warning'} size={21}/><div>{children}</div></div>; }
 export function Tabs({ items, value, onChange }: { items: { value: string; label: string; count?: number }[]; value: string; onChange: (value: string) => void }) { return <div className="tabs" role="tablist">{items.map(item => <button role="tab" type="button" aria-selected={item.value === value} key={item.value} className={item.value === value ? 'selected' : ''} onClick={() => onChange(item.value)}>{item.label}{item.count !== undefined && <small>{item.count}</small>}</button>)}</div>; }
