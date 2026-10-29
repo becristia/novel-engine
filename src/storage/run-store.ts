@@ -1,12 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { z } from 'zod';
+import { BudgetSchema } from '../domain/run.js';
+import type { Budget } from '../domain/run.js';
 import { AppConfigSchema } from '../domain/model-config.js';
 import type { AppConfig } from '../domain/model-config.js';
 import type { ModelUsage, ModelResult } from '../llm/model-gateway.js';
 import { BookStore } from './book-store.js';
 
-export const BudgetSchema = z.strictObject({ maxRequests: z.number().int().positive(), maxTokens: z.number().int().positive() });
-export type Budget = z.infer<typeof BudgetSchema>;
+export { BudgetSchema };
+export type { Budget };
 export type RunStatus = 'queued' | 'running' | 'awaiting_approval' | 'succeeded' | 'failed' | 'cancelled' | 'stale';
 export interface Run {
   id: string; kind: string; baseVersion: number; input: unknown; config: AppConfig; budget: Budget; status: RunStatus; error: string | null; cancelled: boolean;
@@ -19,6 +20,8 @@ export interface Attempt {
 }
 
 export class RunStore {
+  onCreated: ((run: Run) => void) | undefined;
+  expectedBaseVersion: number | undefined;
   constructor(readonly book: BookStore) {}
 
   artifact(id: string, name: string): unknown {
@@ -31,6 +34,7 @@ export class RunStore {
   }
 
   create(kind: string, input: unknown, config: AppConfig, budget: Budget, expectedBaseVersion?: number): Run {
+    expectedBaseVersion ??= this.expectedBaseVersion;
     const id = randomUUID();
     const parsedConfig = AppConfigSchema.parse(config);
     const parsedBudget = BudgetSchema.parse(budget);
@@ -40,7 +44,9 @@ export class RunStore {
       this.book.db.prepare('INSERT INTO runs (id, kind, base_version, input, config, budget, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
         .run(id, kind, version, JSON.stringify(input), JSON.stringify(parsedConfig), JSON.stringify(parsedBudget), 'queued', new Date().toISOString());
     }).immediate();
-    return this.get(id);
+    const run = this.get(id);
+    this.onCreated?.(run);
+    return run;
   }
 
   get(id: string): Run {

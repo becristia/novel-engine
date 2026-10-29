@@ -17,15 +17,18 @@ export class CommitService {
 
   async importFile(file: string, apply: boolean): Promise<{ chapters: { title: string; characters: number }[]; encoding: string; version: number; duplicate: boolean }> {
     const raw = await readFile(file);
+    return this.importBytes(raw, resolve(file), apply);
+  }
+
+  importBytes(raw: Buffer, source: string, apply: boolean, expectedVersion = this.store.project().version) {
     const { text, encoding } = decodeManuscript(raw);
     const chapters = splitChapters(text);
-    const source = resolve(file);
     const digest = hash(raw);
     const previous = this.store.db.prepare('SELECT content_hash, version FROM imports WHERE source = ? OR content_hash = ?').get(source, digest) as { content_hash: string; version: number } | undefined;
     if (previous && previous.content_hash !== digest) throw new Error('同一来源已导入且内容不同，请使用 chapter replace 明确修改章节。');
     const report = { chapters: chapters.map(chapter => ({ title: chapter.title, characters: [...chapter.content].length })), encoding, version: this.store.project().version, duplicate: Boolean(previous) };
     if (!apply || previous) return report;
-    const snapshot = this.store.commit(report.version, `import:${digest}`, digest, state => {
+    const snapshot = this.store.commit(expectedVersion, `import:${digest}`, digest, state => {
       for (const chapter of chapters) {
         const id = randomUUID();
         const revision = this.store.insertRevision(id, chapter.content);
