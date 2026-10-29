@@ -13,6 +13,7 @@ import { BookStore } from '../src/storage/book-store.js';
 import { RunStore } from '../src/storage/run-store.js';
 import { createWorkspace } from '../src/application/workspace.js';
 import type { WorkspaceView } from '../src/application/workbench-query.js';
+import { workspaceView } from '../src/application/workbench-query.js';
 
 const origin = 'http://127.0.0.1:3917';
 const budget = { maxRequests: 8, maxTokens: 64000 };
@@ -176,5 +177,20 @@ describe('local workbench boundary and workflows', () => {
     const run = (await view()).runs[0]!;
     expect(run.interrupted).toBe(true); expect(run.active).toBe(false); expect(run.hasUnknown).toBe(true);
     expect(run.status).toBe('running'); expect(run.attempts[0]!.status).toBe('inflight');
+  });
+
+  it('returns one coherent snapshot if another connection commits during the overview read', () => {
+    const reader = new BookStore(library.path(id), false, true); const writer = new BookStore(library.path(id));
+    const original = reader.snapshot.bind(reader);
+    vi.spyOn(reader, 'snapshot').mockImplementationOnce(() => {
+      const snapshot = original();
+      writer.commit(0, randomUUID(), 'concurrent-author-edit', state => { state.constraints.push('刚刚增加的约束'); });
+      return snapshot;
+    });
+    try {
+      const result = workspaceView(reader);
+      expect(result.project.version).toBe(result.snapshot.version);
+      expect(result.project.version).toBe(0); expect(writer.project().version).toBe(1);
+    } finally { reader.close(); writer.close(); }
   });
 });

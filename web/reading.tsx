@@ -6,7 +6,7 @@ import { workspacePath } from './model.js';
 import { useResource } from './hooks.js';
 import { Badge, Dialog, ErrorText, Icon } from './components.js';
 
-export function Manuscript({ revision, title, reference, locked = [], onLock }: { revision: RevisionView; title: string; reference?: Reference | undefined; locked?: { start: number; end: number }[]; onLock?: (blockId: string) => void }) {
+export function Manuscript({ revision, title, reference, locked = [], onLock, onUnlock }: { revision: RevisionView; title: string; reference?: Reference | undefined; locked?: { id?: string; start: number; end: number }[]; onLock?: ((blockId: string) => void) | undefined; onUnlock?: ((id: string) => void) | undefined }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { if (reference?.revisionId === revision.id) ref.current?.querySelector(`[data-block="${reference.blockId}"]`)?.scrollIntoView({ block: 'nearest' }); }, [reference, revision.id]);
   const startsWithTitle = /^##\s/u.test(revision.blocks[0]?.text ?? '');
@@ -15,10 +15,10 @@ export function Manuscript({ revision, title, reference, locked = [], onLock }: 
     const start = selected && reference?.start !== undefined ? reference.start - block.start : -1;
     const end = selected && reference?.end !== undefined ? reference.end - block.start : -1;
     const text = start >= 0 && end > start ? <>{block.text.slice(0, start)}<mark>{block.text.slice(start, end)}</mark>{block.text.slice(end)}</> : block.text;
-    const isLocked = locked.some(lock => lock.start < block.end && lock.end > block.start);
+    const lock = locked.find(lock => lock.start < block.end && lock.end > block.start); const isLocked = Boolean(lock);
     return <div key={block.id} data-block={block.id} className={`manuscript-block ${selected ? 'highlighted' : ''} ${isLocked ? 'locked' : ''}`}>
       {heading ? <h2 className="manuscript-title">{block.text.replace(/^##\s+/u, '')}</h2> : <p>{text}</p>}
-      {isLocked && <span className="block-lock" title="此段已锁定"><Icon name="lock" size={15}/></span>}
+      {isLocked && <span className="block-lock" title="此段已锁定">{onUnlock && lock?.id ? <button type="button" aria-label={`解除段落 ${block.id} 的锁定`} onClick={() => onUnlock(lock.id!)}><Icon name="lock" size={15}/></button> : <Icon name="lock" size={15}/>}</span>}
       {onLock && !heading && !isLocked && <button className="lock-control" type="button" aria-label={`锁定段落 ${block.id}`} onClick={() => onLock(block.id)}><Icon name="lock" size={16}/></button>}
     </div>;
   })}</div>;

@@ -82,23 +82,25 @@ export function runView(book: BookStore, id: string) {
 }
 
 export function workspaceView(book: BookStore) {
-  const snapshot = book.snapshot(); const proposals = new ProposalStore(book).list();
-  const runs = (book.db.prepare('SELECT id, created_at AS createdAt FROM runs ORDER BY rowid DESC').all() as { id: string; createdAt: string }[]).map(row => ({ ...runView(book, row.id), createdAt: row.createdAt }));
-  const memory = new MemoryStore(book).entries().map(entry => ({
-    ...entry,
-    sourceChapterId: book.revision(entry.revisionId).chapterId,
-    fact: entry.kind === 'fact' ? FactSchema.parse(JSON.parse(entry.payload)) : null,
-    summary: entry.kind === 'summary' ? SummarySchema.parse(JSON.parse(entry.payload)) : null,
-    eligible: entry.kind === 'fact' && entry.status === 'fresh' && snapshot.state.confirmedFactIds.includes(entry.id),
-  }));
-  return {
-    project: book.project(), snapshot,
-    proposals: proposals.map(proposal => ({ ...proposal, approval: approvalState(book, proposal), stale: proposal.baseVersion !== snapshot.version })),
-    runs, memory,
-    memorySources: book.db.prepare('SELECT revision_id AS revisionId, content_hash AS contentHash, status FROM memory_sources').all() as { revisionId: string; contentHash: string; status: string }[],
-    versions: book.db.prepare('SELECT version, created_at AS createdAt FROM snapshots ORDER BY version DESC').all() as { version: number; createdAt: string }[],
-    patches: proposals.filter(item => item.kind === 'patch').map(item => ({ ...item, payload: PatchPayloadSchema.parse(item.payload) })),
-  };
+  return book.db.transaction(() => {
+    const snapshot = book.snapshot(); const proposals = new ProposalStore(book).list();
+    const runs = (book.db.prepare('SELECT id, created_at AS createdAt FROM runs ORDER BY rowid DESC').all() as { id: string; createdAt: string }[]).map(row => ({ ...runView(book, row.id), createdAt: row.createdAt }));
+    const memory = new MemoryStore(book).entries().map(entry => ({
+      ...entry,
+      sourceChapterId: book.revision(entry.revisionId).chapterId,
+      fact: entry.kind === 'fact' ? FactSchema.parse(JSON.parse(entry.payload)) : null,
+      summary: entry.kind === 'summary' ? SummarySchema.parse(JSON.parse(entry.payload)) : null,
+      eligible: entry.kind === 'fact' && entry.status === 'fresh' && snapshot.state.confirmedFactIds.includes(entry.id),
+    }));
+    return {
+      project: book.project(), snapshot,
+      proposals: proposals.map(proposal => ({ ...proposal, approval: approvalState(book, proposal), stale: proposal.baseVersion !== snapshot.version })),
+      runs, memory,
+      memorySources: book.db.prepare('SELECT revision_id AS revisionId, content_hash AS contentHash, status FROM memory_sources').all() as { revisionId: string; contentHash: string; status: string }[],
+      versions: book.db.prepare('SELECT version, created_at AS createdAt FROM snapshots ORDER BY version DESC').all() as { version: number; createdAt: string }[],
+      patches: proposals.filter(item => item.kind === 'patch').map(item => ({ ...item, payload: PatchPayloadSchema.parse(item.payload) })),
+    };
+  }).deferred();
 }
 
 export function configurationView(loaded: LoadedConfig) {

@@ -404,3 +404,111 @@ th,td{padding:12px}
 @media(max-width:1450px){.memory-layout{grid-template-columns:170px minmax(0,1fr) 310px}.memory-table td{padding:14px 12px;font-size:15px}.memory-table th{padding:13px 12px}.memory-tools{flex-wrap:wrap}.memory-tools>select{width:auto}.memory-inspector{padding:20px 16px}.memory-inspector h2{font-size:21px}}
 @media(max-width:1180px){.memory-layout{grid-template-columns:170px minmax(0,1fr);grid-template-areas:"people table" "context context" "source source"}.memory-context{margin-left:0}.memory-inspector{max-height:none}}
 @media(max-width:720px){.memory-layout{grid-template-columns:1fr;grid-template-areas:"people" "table" "source" "context"}.people-panel{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.people-panel h2{width:100%;margin-bottom:10px}.people-panel>button:not(.button){width:auto;font-size:15px;padding:7px 10px}.people-panel>.divider,.people-panel>.help-text{display:none}.memory-table{overflow-x:auto}.memory-context{padding:16px}.memory-tools .search-box{width:100%}}
+/* Local revision and version history */
+.main[data-page=patches]:not([data-page=chapters]) .page-header{min-height:42px;margin-bottom:20px}
+.main[data-page=patches] .header-actions{padding-top:0}
+.impact-brief{display:flex;align-items:center;gap:24px;border:1px solid var(--line);background:#fff;border-radius:6px;padding:20px 24px;margin-bottom:24px}
+.impact-brief>div{flex:1;min-width:0}
+.impact-brief strong{font-size:16px}
+.impact-brief p{margin:7px 0 0;font-size:17px;line-height:1.6}
+.impact-brief>.link-button{white-space:nowrap;margin-left:12px}
+.patch-selector{max-width:270px;margin-bottom:16px}
+.patch-layout{display:grid;grid-template-columns:260px minmax(430px,1fr) 240px;gap:10px;align-items:stretch;min-height:calc(100dvh - 320px)}
+.patch-groups{display:flex;flex-direction:column;padding:22px 18px}
+.patch-groups h2{font-size:25px;margin-bottom:24px}
+.group-card{display:flex;gap:16px;border:1px solid var(--line);background:#fff;border-radius:5px;padding:18px 12px;line-height:1.6;cursor:pointer}
+.group-card input{margin-top:3px}
+.group-card.selected{background:#f0f5ee}
+.group-card>span{min-width:0;display:flex;flex-direction:column;gap:12px}
+.group-card strong{font-size:16px;font-weight:600}
+.group-card small{font-size:13px;color:#818a7b}
+.patch-groups .panel-foot{border:0;margin-top:auto;padding-top:28px;color:#4e5d49}
+.diff-panel{padding:22px;display:flex;flex-direction:column}
+.diff-panel>.row-title{margin-bottom:22px;flex-wrap:wrap}
+.diff-panel h2{font-size:23px}
+.compact button{padding:9px 14px;font-size:14px}
+.diff-columns{display:grid;grid-template-columns:1fr 1fr;gap:10px;min-height:0;flex:1}
+.diff-columns.combined{grid-template-columns:1fr}
+.diff-column{border:1px solid var(--line);border-radius:6px;min-width:0;overflow:hidden}
+.diff-column>h3{background:#fafbf7;border-bottom:1px solid #eef0eb;font-size:18px;padding:20px;margin:0}
+.diff-text{padding:25px 22px;font-family:"Songti SC","SimSun",serif;font-size:20px;line-height:1.95;white-space:pre-wrap;overflow-wrap:anywhere}
+.diff-text>span{box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.diff-added,.diff-removed{display:inline;background:#edf6ed;color:#325e3b;padding:5px 2px}
+.diff-removed{background:#fff0ee;color:#b03832}
+.diff-text b{font-family:Arial,sans-serif;font-size:20px}
+.diff-locked{display:block;border-left:3px solid #e1b65c;padding:12px 0 12px 16px;margin:14px 0;white-space:pre-wrap}
+.diff-locked small{display:flex;align-items:center;gap:6px;font:13px/1.5 "PingFang SC",sans-serif;color:#a16d1c;margin-bottom:12px}
+.impact-panel{padding:20px 18px}
+.impact-panel h2{font-size:22px;margin-bottom:24px}
+.impact-panel h3{font-size:16px}
+.impact-count{display:flex;align-items:center;justify-content:space-between;font-size:16px;padding:12px 0}
+.error-text{color:var(--red)}
+.dependency-row{font-size:14px;background:#f6f7f3;border:1px solid var(--line);padding:10px;border-radius:5px}
+.impact-panel .banner{padding:13px 10px;font-size:13px;gap:8px}
+.next-steps{counter-reset:next;list-style:none;padding:0;margin:20px 0}
+.next-steps li{display:flex;align-items:center;gap:15px;margin-bottom:18px;font-size:16px;counter-increment:next}
+.next-steps li:before{content:counter(next);width:30px;height:30px;display:flex;align-items:center;justify-content:center;border-radius:50%;background:#eef2ea;flex-shrink:0}
+.impact-panel details{font-size:14px;margin-top:18px;color:#66745f}
+.impact-panel summary{cursor:pointer}
+.impact-evidence{margin-top:18px;font-size:13px}
+.impact-evidence blockquote{margin:8px 0;padding:10px;background:#f8f8f3;line-height:1.7}
+.selection-review{margin-top:22px}
+.selection-review h2{font-size:23px}
+.selection-chapters{margin-top:20px;display:flex;flex-direction:column;gap:12px}
+.selection-chapters>div{display:flex;align-items:center;gap:18px;border:1px solid var(--line);border-radius:5px;padding:14px 18px}
+.selection-chapters strong{flex:1}
+.selection-chapters .button{min-height:36px;padding:7px 14px;font-size:14px}
+.selection-review .field{margin-top:20px}
+.undo-preview{margin-top:20px}
+.undo-preview pre{white-space:pre-wrap;max-height:260px;overflow:auto;font:16px/1.7 "Songti SC","SimSun",serif;background:#f5f7f0;padding:18px;border:1px solid var(--line);border-radius:5px}
+.block-lock button{border:0;background:#fff8de;color:#a16d1c;padding:3px;border-radius:3px;display:flex}
+.versions-layout{display:grid;grid-template-columns:290px minmax(0,1fr) 390px;gap:10px;min-height:calc(100dvh - 155px);align-items:stretch}
+.version-history{padding:24px 14px}
+.version-history h2{padding-left:10px}
+.version-list{max-height:calc(100dvh - 290px);overflow:auto}
+.version-list>button{position:relative;display:flex;flex-direction:column;gap:10px;width:100%;text-align:left;border:0;border-bottom:1px solid var(--line);border-radius:4px;background:white;padding:22px 28px 22px 12px;color:inherit}
+.version-list>button.selected{background:#eaf2e9}
+.version-list>button>span{display:flex;gap:15px;align-items:center}
+.version-list strong{font-size:21px;font-weight:500}
+.version-list .badge{font-size:12px;padding:3px 7px}
+.version-list small{color:#828a7c;font-size:13px}
+.version-list svg{position:absolute;right:8px;top:40px}
+.version-reader{padding:18px;display:flex;flex-direction:column;gap:18px}
+.version-reader>.banner{font-size:15px}
+.version-paper{flex:1;min-height:360px;border:1px solid var(--line);border-radius:6px}
+.version-paper .manuscript{padding:28px 24px 10px;font-size:21px}
+.version-paper .manuscript-title{font-size:32px;margin-bottom:42px}
+.restore-bar{display:flex;gap:18px;align-items:center;border-top:1px solid var(--line);padding:18px 0 2px}
+.restore-bar>.button{font-size:15px;padding:12px 20px;flex-shrink:0}
+.export-panel{padding:24px}
+.export-version{padding:18px;background:#f4f6f1;border-radius:5px;display:flex;flex-direction:column;gap:10px}
+.export-version strong{font-size:23px}
+.export-version small{color:#788372;font-size:14px}
+.export-panel h3{font-size:17px;margin-bottom:18px}
+.radio-label{display:flex;align-items:center;gap:16px;margin:18px 0;font-size:18px}
+.export-scope{background:#f5f6f2;padding:14px 16px;border-radius:5px;font-size:17px;margin:0}
+.export-panel .banner{font-size:14px;padding:13px}
+.export-panel>.wide{min-height:56px;font-size:20px;margin:18px 0 0}
+.export-check{display:flex;align-items:center;gap:18px;margin:20px 0;font-size:17px}
+.export-check svg{color:var(--green)}
+.chapter-order{font-size:14px;margin:22px 10px;color:#6d7965}
+.chapter-order summary{cursor:pointer}
+.chapter-order>div{display:flex;align-items:center;gap:8px;margin:10px 0}
+.chapter-order>div>span{flex:1;min-width:0}
+.chapter-order button{background:white;border:1px solid var(--line);border-radius:3px;padding:3px 7px}
+@media(max-width:1450px){.patch-layout{grid-template-columns:220px minmax(390px,1fr) 210px}.patch-groups{padding:20px 14px}.diff-panel{padding:20px 16px}.diff-text{padding:22px 16px;font-size:18px}.diff-column>h3{font-size:16px;padding:16px}.impact-panel{padding:18px 14px}.versions-layout{grid-template-columns:230px minmax(0,1fr) 320px}.export-panel{padding:22px}.version-history{padding:22px 12px}.version-list strong{font-size:18px}.version-paper .manuscript{font-size:19px}.version-paper .manuscript-title{font-size:28px}.restore-bar{flex-wrap:wrap}}
+@media(max-width:1250px){.patch-layout{grid-template-columns:220px minmax(0,1fr)}.impact-panel{grid-column:1/-1;display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap}.impact-panel>.divider{display:none}.impact-panel .next-steps{margin:0}.impact-panel .help-text{max-width:280px}.impact-brief{flex-wrap:wrap}.impact-brief>div{flex-basis:100%}.versions-layout{grid-template-columns:200px minmax(0,1fr)}.export-panel{grid-column:2}.version-list .badge{display:none}}
+@media(max-width:800px){.patch-layout{grid-template-columns:1fr}.patch-groups .stack{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}.patch-groups .panel-foot{padding-top:16px}.selection-chapters>div{flex-wrap:wrap}.selection-chapters strong{flex-basis:100%}.versions-layout{grid-template-columns:1fr}.version-history .version-list{display:flex;overflow:auto;max-height:none}.version-list>button{width:150px;flex-shrink:0}.export-panel{grid-column:auto}.chapter-order{margin:20px 0 0}.version-paper .manuscript{padding:25px}.impact-brief{padding:18px}}
+@media(max-width:600px){.diff-columns{grid-template-columns:1fr;min-height:0}.impact-brief>.badge{white-space:normal}.diff-panel>.row-title{gap:15px}.diff-text{font-size:18px}.group-card{padding:14px}.patch-layout{min-height:0}.versions-layout{min-height:0}.version-reader{padding:14px}.version-paper{min-height:280px}}
+.diff-title{min-width:0;flex:1}
+.diff-title select{width:100%;min-height:38px;border:0;padding:0 20px 0 0;background:transparent;font-size:23px;font-weight:600}
+.main[data-page=patches]>.app-caption{display:none}
+.impact-panel .divider{margin:18px 0}
+.impact-panel .next-steps li{margin-bottom:14px}
+.impact-panel .help-text{font-size:13px;line-height:1.6}
+.export-panel .divider{margin:18px 0}
+.export-panel h3{margin-bottom:12px}
+.export-panel .radio-label{margin:12px 0}
+.export-panel .field{margin-bottom:12px}
+.export-panel>.wide{min-height:54px;margin:12px 0 0}
+.export-panel .export-check{margin:14px 0}

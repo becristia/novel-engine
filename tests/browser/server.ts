@@ -36,6 +36,14 @@ function fixtureResponse(request: ModelRequest): string {
     const block = source.blocks.find(item => !item.text.startsWith('##'))!;
     return JSON.stringify({ summary: block.text, evidence: [{ chapterId: source.chapterId, revisionId: source.revisionId, blockId: block.id, quote: block.text }] });
   }
+  if (request.prompt.startsWith('分析作者修改要求')) {
+    const input = JSON.parse(request.prompt.split('\n').find(line => line.startsWith('{"instruction"'))!) as { sources: { chapterId: string; revisionId: string; blocks: { id: string; text: string }[] }[] };
+    const changes = input.sources.slice(0, 3).map((source, index) => {
+      const block = source.blocks.find(item => !item.text.startsWith('##'))!;
+      return { target: { chapterId: source.chapterId, revisionId: source.revisionId, blockId: block.id, quote: block.text }, replacement: ['林舟仍不确定，那位船长为什么会在信里提到自己。', '林舟收起信封，决定先核对那趟失踪的航次。', '林舟望向远处忽明忽暗的航灯。'][index]! };
+    });
+    return JSON.stringify({ impacts: changes.map((change, index) => ({ chapterId: change.target.chapterId, kind: index === 0 ? 'direct-conflict' : 'causal-check', explanation: '核对林舟获知身份线索的时机。', evidence: [change.target] })), groups: changes.map((change, index) => ({ id: `g${index + 1}`, reason: ['延后身份揭示', '修正提前知情', '调整伏笔措辞'][index], dependsOn: index === 1 ? ['g1'] : [], changes: [change] })) });
+  }
   if (request.prompt.startsWith('返回一个对象')) return '{"ok":true}';
   throw new Error('Browser fixture received an unsupported prompt.');
 }

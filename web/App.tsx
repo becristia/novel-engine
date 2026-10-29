@@ -7,6 +7,8 @@ import { ChaptersPage } from './pages/Chapters.js';
 import { RunsPage } from './pages/Runs.js';
 import { SettingsPage } from './pages/Settings.js';
 import { MemoryPage } from './pages/Memory.js';
+import { PatchesPage } from './pages/Patches.js';
+import { VersionsPage } from './pages/Versions.js';
 import { chapterCatalog, chapterCandidates, chapterStatus } from './chapters.js';
 import { allowNavigation } from './hooks.js';
 import { pageNames, workspacePath } from './model.js';
@@ -79,7 +81,7 @@ export function App() {
       <a className={`settings-link ${page === 'settings' ? 'active' : ''}`} href="#/settings" onClick={e => { e.preventDefault(); navigate('settings'); }}><Icon name="settings"/><span>模型与设置</span></a>
     </aside>
     <main className="main" data-page={page}><div className="app-caption">本地工作台</div>{notice && <div className="notice" role={notice.error ? 'alert' : 'status'}><Banner tone={notice.error ? 'red' : 'green'}>{notice.text}</Banner><Button variant="ghost" icon="close" aria-label="关闭提示" onClick={() => setNotice(null)}/></div>}
-      {page === 'books' ? <LibraryPage entries={entries} selected={workspace} onSelect={select} refresh={refresh} busy={busy} perform={perform} notify={notify}/> : page === 'planning' && props ? <PlanningPage {...props}/> : page === 'chapters' && props ? <ChaptersPage {...props}/> : page === 'memory' && props ? <MemoryPage {...props}/> : page === 'runs' && props ? <RunsPage {...props}/> : page === 'settings' ? <SettingsPage config={config} data={data} budget={budget} setBudget={setBudget} busy={busy} perform={perform} refreshConfig={refreshConfig} notify={notify} job={job} navigate={navigate}/> : <><PageHeader title={pageNames[page]}/><Empty title={data ? '准备开始创作' : '选择一部作品'} detail={data ? '当前作品的创作内容将在这里显示。' : '打开已有作品，或导入自己的稿件。'}><Button variant="primary" onClick={() => navigate('books')}>打开作品入口</Button></Empty></>}
+      {page === 'books' ? <LibraryPage entries={entries} selected={workspace} onSelect={select} refresh={refresh} busy={busy} perform={perform} notify={notify}/> : page === 'planning' && props ? <PlanningPage {...props}/> : page === 'chapters' && props ? <ChaptersPage {...props}/> : page === 'memory' && props ? <MemoryPage {...props}/> : page === 'patches' && props ? <PatchesPage {...props}/> : page === 'versions' && props ? <VersionsPage {...props}/> : page === 'runs' && props ? <RunsPage {...props}/> : page === 'settings' ? <SettingsPage config={config} data={data} budget={budget} setBudget={setBudget} busy={busy} perform={perform} refreshConfig={refreshConfig} notify={notify} job={job} navigate={navigate}/> : <><PageHeader title={pageNames[page]}/><Empty title={data ? '准备开始创作' : '选择一部作品'} detail={data ? '当前作品的创作内容将在这里显示。' : '打开已有作品，或导入自己的稿件。'}><Button variant="primary" onClick={() => navigate('books')}>打开作品入口</Button></Empty></>}
     </main>
   </div>;
 }
