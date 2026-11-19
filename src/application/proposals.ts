@@ -7,6 +7,7 @@ import { RunStore } from '../storage/run-store.js';
 import { ReviewStore } from '../storage/review-store.js';
 import { validateReview, validateExtraction } from '../review/evidence.js';
 import { acceptSelection } from '../proposals/patches.js';
+import { applyScenePlans } from './story-planning.js';
 
 export class ProposalService {
   readonly proposals: ProposalStore;
@@ -26,7 +27,7 @@ export class ProposalService {
       let details: unknown = {};
       if (current.kind === 'plan') {
         const payload = PlanPayloadSchema.parse(current.payload);
-        for (const plan of payload.plans) state.plans[plan.chapterId] = plan;
+        for (const plan of payload.plans) { state.plans[plan.chapterId] = plan; applyScenePlans(state, plan); }
       } else if (current.kind === 'draft') {
         const payload = DraftPayloadSchema.parse(current.payload);
         const revision = this.book.revision(payload.revisionId);
@@ -40,6 +41,11 @@ export class ProposalService {
         const existing = state.chapters.find(chapter => chapter.id === payload.chapterId);
         if (existing) existing.revisionId = revision.id;
         else state.chapters.push({ id: payload.chapterId, title: plan.title, revisionId: revision.id });
+        for (const range of payload.sceneRanges ?? []) {
+          const scene = state.story?.scenes.find(item => item.id === range.sceneId && item.chapterId === payload.chapterId);
+          if (!scene || range.start >= range.end || range.end > revision.content.length) throw new Error('场景范围与实际候选不一致。');
+          Object.assign(scene, { start: range.start, end: range.end, revisionId: revision.id });
+        }
         approvedRevision = revision.id; approvedReview = reports.reviewId;
       } else if (current.kind === 'selection') details = acceptSelection(this.book, current, state, reason);
       else throw new Error('该提案类型需要先形成可审稿的候选。');

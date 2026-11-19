@@ -10,6 +10,7 @@ import { workbenchAction } from '../application/workbench-actions.js';
 import { configurationView, revisionView, runView, workspaceView } from '../application/workbench-query.js';
 import { HttpError, publicError } from '../application/workbench-errors.js';
 import { buildContext } from '../context/builder.js';
+import { buildSceneContext } from '../context/story-builder.js';
 import { PatchService } from '../proposals/patches.js';
 import { replayRun } from '../workflows/replay.js';
 
@@ -61,7 +62,9 @@ export function createWorkbenchApp(options: AppOptions) {
       if (resource === 'revisions' && parts[4] && method === 'GET') return json(useBook(id, false, book => revisionView(book, parts[4]!)));
       if (resource === 'snapshot' && method === 'GET') return json(useBook(id, false, book => book.snapshot(versionSchema.parse(url.searchParams.get('version')))));
       if (resource === 'context' && method === 'GET') {
-        const config = await options.config(); const chapter = z.coerce.number().int().positive().parse(url.searchParams.get('chapter'));
+        const config = await options.config();
+        if (url.searchParams.has('scene')) return json(useBook(id, false, book => buildSceneContext(book, z.string().min(1).parse(url.searchParams.get('scene')), config.config)));
+        const chapter = z.coerce.number().int().positive().parse(url.searchParams.get('chapter'));
         return json(useBook(id, false, book => buildContext(book, chapter, config.config)));
       }
       if (resource === 'preview' && method === 'POST') {

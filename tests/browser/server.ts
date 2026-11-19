@@ -11,6 +11,11 @@ const unknownPrompts = new Set<string>();
 // This deterministic transport is only a browser-test fixture; it never constructs
 // a real provider. Source IDs are read from the exact prompt sent by the core.
 function fixtureResponse(request: ModelRequest): string {
+  if (request.prompt.startsWith('你是小说场景规划助手')) {
+    const count = Number(/章节数：(\d+)/u.exec(request.prompt)?.[1] ?? 1);
+    return JSON.stringify({ chapters: Array.from({ length: count }, (_, index) => ({ title: `场景章节 ${index + 1}`, goal: '继续核对信封', characters: ['林舟'], constraints: [], events: [], targetLength: 2000, scenes: ['调查信封', '查看封口'].map((title, n) => ({ id: `fixture-scene-${index}-${n}`, title, goal: '核对信封的来历。', instructions: [], narration: 'limited', viewpointCharacter: '林舟', eventId: null, revealClaimIds: [], threadIds: [] })) })) });
+  }
+  if (request.prompt.startsWith('你是小说场景写作助手')) return '林舟相信信封藏有线索。他把信封放到桌上，仔细核对封口。';
   if (request.prompt.startsWith('你是小说规划助手')) {
     const count = Number(/章节数：(\d+)/u.exec(request.prompt)?.[1] ?? 3);
     return JSON.stringify({ chapters: Array.from({ length: count }, (_, index) => ({ title: ['雨夜归港', '封存的信', '旧伤'][index] ?? `后续章节 ${index + 1}`, goal: '寻找旧信与失踪航次的线索。', characters: ['林舟', '沈砚'], constraints: ['保留林舟的有限视角。'], events: ['发现线索', '决定继续调查'], targetLength: 3200, viewpointCharacter: '林舟' })) });
@@ -27,7 +32,11 @@ function fixtureResponse(request: ModelRequest): string {
     return JSON.stringify({ summary: conflict ? '需要处理伤势冲突。' : '本次审稿未发现问题。', issues: conflict ? [{ id: 'injury', kind: 'conflict', message: '伤势前后矛盾', suggestion: '改用左手记录。', evidence: [{ chapterId: target.chapterId, revisionId: target.revisionId, blockId: conflict.id, quote: conflict.text }] }] : [] });
   }
   if (request.prompt.startsWith('从目标候选正文')) {
-    const source = JSON.parse(request.prompt.split('\n').find(line => line.startsWith('{"chapterId"'))!) as { chapterId: string; revisionId: string; blocks: { id: string; text: string }[] };
+    const source = JSON.parse(request.prompt.split('\n').find(line => line.startsWith('{"chapterId"'))!) as { chapterId: string; revisionId: string; contentHash: string; blocks: { id: string; text: string; start: number; end: number }[]; identities?: { entities: { id: string; name: string }[] } };
+    if (request.prompt.startsWith('从目标候选正文抽取记忆变更')) {
+      const block = source.blocks.find(item => !item.text.startsWith('##'))!; const person = source.identities!.entities.find(item => item.name === '林舟')!.id;
+      return JSON.stringify({ facts: [], story: { events: [], claims: [{ id: 'belief-envelope', subjectId: person, relation: 'event', value: '相信信封藏有线索', kind: 'belief', holderId: person, fromEventId: null, untilEventId: null, visibility: 'public', confirmed: false, status: 'pending', dependsOn: [], correctsId: null, source: { kind: 'text', chapterId: source.chapterId, revisionId: source.revisionId, contentHash: source.contentHash, blockId: block.id, quote: block.text, start: block.start, end: block.end } }], knowledge: [], disclosures: [], threads: [] } });
+    }
     const block = source.blocks.find(item => item.text.includes('铜钥匙'));
     return JSON.stringify({ facts: block ? [{ subject: '林舟', relation: 'possession', value: '铜钥匙', kind: 'fact', characterId: '林舟', storyTime: null, knowledgeTime: null, evidence: { chapterId: source.chapterId, revisionId: source.revisionId, blockId: block.id, quote: block.text } }] : [] });
   }

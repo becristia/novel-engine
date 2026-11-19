@@ -33,6 +33,9 @@ export class MemoryStore {
     this.book.db.prepare('INSERT INTO memory_sources VALUES (?, ?, ?) ON CONFLICT(revision_id) DO UPDATE SET status = excluded.status').run(revisionId, revision.contentHash, status);
     for (const fact of checked.facts) {
       const payload = JSON.stringify(fact); const id = hash(`fact:${revisionId}:${payload}`);
+      // A correction is also a tombstone for the old extraction. Rebuilding the
+      // same source must not revive it or copy it onto another revision.
+      if (this.book.db.prepare('SELECT id FROM memory_entries WHERE parent_id=? LIMIT 1').get(id)) continue;
       this.book.db.prepare("INSERT INTO memory_entries VALUES (?, 'fact', ?, ?, ?, ?, 0, 'model', NULL) ON CONFLICT(id) DO UPDATE SET status = excluded.status, confirmed = CASE WHEN memory_entries.status = 'stale' THEN 0 ELSE memory_entries.confirmed END")
         .run(id, revisionId, revision.contentHash, payload, status);
     }

@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { BookStateSchema, hash } from '../domain/workspace.js';
 import type { BookState, Revision, Snapshot } from '../domain/workspace.js';
 import { WorkspaceDatabase } from './database.js';
+import { invalidateStory } from './story-invalidation.js';
+import { queueMemoryJobs } from './memory-jobs.js';
 
 export class BookStore extends WorkspaceDatabase {
   initialize(title: string): void {
@@ -49,6 +51,7 @@ export class BookStore extends WorkspaceDatabase {
       if (current.version !== expectedVersion) throw new Error('项目版本冲突，请基于最新版本重新操作。');
       const before = structuredClone(current.state);
       mutate(current.state);
+      invalidateStory(before, current.state);
       const state = BookStateSchema.parse(current.state);
       if (new Set(state.chapters.map(chapter => chapter.id)).size !== state.chapters.length) throw new Error('章节身份重复。');
       for (const chapter of state.chapters) {
@@ -63,10 +66,17 @@ export class BookStore extends WorkspaceDatabase {
         if (kept.contentHash !== revision.contentHash || revision.content.slice(kept.start, kept.end) !== lock.quote) throw new Error('锁定内容发生变化，提交已拒绝。');
       }
       const appendOnly = before.chapters.every((chapter, index) => state.chapters[index]?.id === chapter.id && state.chapters[index]?.revisionId === chapter.revisionId);
-      if (!appendOnly || JSON.stringify(before.constraints) !== JSON.stringify(state.constraints)) {
+      const sameExistingOrder = before.chapters.map(chapter => chapter.id).filter(id => state.chapters.some(chapter => chapter.id === id)).join() === state.chapters.map(chapter => chapter.id).filter(id => before.chapters.some(chapter => chapter.id === id)).join();
+      if (!sameExistingOrder || JSON.stringify(before.constraints) !== JSON.stringify(state.constraints)) {
         this.db.prepare("UPDATE memory_entries SET status = 'stale' WHERE status = 'fresh'").run();
         this.db.prepare("UPDATE memory_sources SET status = 'stale' WHERE status = 'fresh'").run();
         state.confirmedFactIds = [];
+      } else if (!appendOnly) {
+        for (const chapter of before.chapters.filter(previous => !state.chapters.some(next => next.revisionId === previous.revisionId))) {
+          this.db.prepare("UPDATE memory_entries SET status='stale' WHERE revision_id=?").run(chapter.revisionId);
+          this.db.prepare("UPDATE memory_sources SET status='stale' WHERE revision_id=?").run(chapter.revisionId);
+        }
+        state.confirmedFactIds = state.confirmedFactIds.filter(id => Boolean(this.db.prepare("SELECT id FROM memory_entries WHERE id=? AND status='fresh'").get(id)));
       }
       for (const chapter of state.chapters) {
         this.db.prepare("UPDATE memory_entries SET status = 'fresh' WHERE revision_id = ? AND status = 'pending'").run(chapter.revisionId);
@@ -76,6 +86,7 @@ export class BookStore extends WorkspaceDatabase {
       }
       state.confirmedFactIds = [...new Set(state.confirmedFactIds)];
       const next = current.version + 1;
+      if (state.story) queueMemoryJobs(this.db, this.project().id, state, next);
       this.db.prepare('INSERT INTO snapshots VALUES (?, ?, ?)').run(next, JSON.stringify(state), new Date().toISOString());
       const changed = this.db.prepare('UPDATE project SET version = ? WHERE version = ?').run(next, expectedVersion);
       if (changed.changes !== 1) throw new Error('项目版本冲突。');

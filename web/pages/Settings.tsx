@@ -12,6 +12,7 @@ export function SettingsPage({ config, data, budget, setBudget, busy, perform, r
   const canProbe = Boolean(data && config?.credentialAvailable && config.offlineOk && !busy && !modelBusy);
   return <>
     <PageHeader title="模型与设置" subtitle="检查本地配置，为下一次任务设置预算。" actions={<Badge>{config?.provider === 'fake' ? '离线模型' : '本地配置'}</Badge>}/>
+    <Panel title="故事检索"><Badge>本地规则与来源检索</Badge><p>Hindsight 尚未通过真实服务、中文召回和内部费用控制准入。当前使用本地读取路径，页面浏览和上下文预览不调用外部检索。</p></Panel>
     {!config ? <Panel><Banner>无法读取模型配置，请检查启动时指定的配置文件。</Banner><Button onClick={() => void perform(refreshConfig).catch(() => undefined)}>重新检查配置</Button></Panel> : <div className="settings-layout">
       <div className="stack"><Panel className="model-panel"><div className="section-heading"><h2>当前模型</h2><Badge>只读</Badge></div><dl className="model-values">
         <div><dt>接口类型</dt><dd>{config.provider === 'fake' ? 'FakeProvider · 离线响应' : 'OpenAI 兼容'}</dd></div>

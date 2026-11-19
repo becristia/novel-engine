@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "entities": [{"id":"lin","name":"林舟","aliases":["小林"]},{"id":"shen","name":"沈砚","aliases":[]},{"id":"gu","name":"顾宁","aliases":[]}],
+  "events": [
+    {"id":"crime","title":"案件发生","occurrence":"actual","source":{"kind":"author","decisionId":"a1"}},
+    {"id":"suspect","title":"林舟误信沈砚","occurrence":"actual","source":{"kind":"author","decisionId":"a2"}},
+    {"id":"visit","title":"林舟再次调查","occurrence":"actual","source":{"kind":"author","decisionId":"a3"}},
+    {"id":"learn","title":"获知顾宁身份","occurrence":"planned","source":{"kind":"author","decisionId":"a4"}}
+  ],
+  "order": [{"before":"crime","after":"suspect"},{"before":"suspect","after":"visit"},{"before":"visit","after":"learn"}],
+  "scenes": [
+    {"id":"reader-reveal","chapterId":"c5","title":"读者看见真相","eventId":"crime","viewpointId":null,"narration":"omniscient","goal":"呈现顾宁行动。","instructions":[],"revisionId":null},
+    {"id":"investigation","chapterId":"c6","title":"继续误信","eventId":"visit","viewpointId":"lin","narration":"limited","goal":"调查失踪航次。","instructions":["人物尚未核实真凶。"],"revisionId":null},
+    {"id":"truth","chapterId":"c8","title":"计划中的揭示","eventId":"learn","viewpointId":"lin","narration":"limited","goal":"核对线索。","instructions":[],"revisionId":null}
+  ],
+  "claims": [
+    {"id":"killer","subjectId":"gu","relation":"identity","value":"真凶","kind":"fact","holderId":null,"fromEventId":"crime","untilEventId":null,"visibility":"restricted","confirmed":true,"status":"fresh","source":{"kind":"author","decisionId":"a5"},"dependsOn":[],"correctsId":null},
+    {"id":"mistake","subjectId":"shen","relation":"identity","value":"林舟误认为是真凶","kind":"belief","holderId":"lin","fromEventId":"suspect","untilEventId":null,"visibility":"public","confirmed":true,"status":"fresh","source":{"kind":"author","decisionId":"a6"},"dependsOn":[],"correctsId":null}
+  ],
+  "knowledge": [{"id":"belief-lin","characterId":"lin","claimId":"mistake","stance":"believes","learnedAt":"suspect","untilEventId":null,"source":{"kind":"author","decisionId":"a7"},"status":"fresh"}],
+  "disclosures": [{"id":"reveal-reader","claimId":"killer","sceneId":"reader-reveal","level":"reveal","status":"actual","source":{"kind":"author","decisionId":"a8"}}],
+  "threads": [{"id":"letter","title":"旧信伏笔","instruction":"让角色再次核对信封的日期。","status":"planned","dueSceneId":"investigation","claimIds":[],"source":{"kind":"author","decisionId":"a9"}}],
+  "rules": [{"id":"style","text":"保持克制的叙述语气。","kind":"style","visibility":"writer","source":{"kind":"author","decisionId":"a10"}}]
+}

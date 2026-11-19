@@ -14,6 +14,10 @@ import { blocks, validateReview, validateExtraction } from '../review/evidence.j
 import { PatchService } from '../proposals/patches.js';
 import { isSupportedNode } from '../cli/doctor.js';
 import { publicError } from './workbench-errors.js';
+import { StoryStore } from '../storage/story-store.js';
+import { MemoryJobStore } from '../storage/memory-jobs.js';
+import { ContextSchema } from '../context/builder.js';
+import { hindsightStatus } from '../context/hindsight.js';
 
 export function approvalState(book: BookStore, proposal: Proposal) {
   let requiresReason = false;
@@ -51,8 +55,17 @@ export function approvalState(book: BookStore, proposal: Proposal) {
 export function revisionView(book: BookStore, id: string) {
   const revision = book.revision(id); const reports = new ReviewStore(book);
   const review = reports.latest('reviews', id); const extraction = reports.latest('extractions', id);
+  const runs = new RunStore(book);
+  const revised = revision.runId ? runs.artifact(revision.runId, 'revision') as { revisionId: string } | undefined : undefined;
+  const prefix = revised?.revisionId === id ? 'context:revision:%' : 'context:draft:%';
+  const writerContexts = revision.runId ? (book.db.prepare('SELECT value FROM run_artifacts WHERE run_id=? AND name LIKE ? ORDER BY rowid').all(revision.runId, prefix) as { value: string }[]).map(row => {
+    const value = JSON.parse(row.value) as { context: unknown; continuation: { sceneId: string; contentHash: string; text: string }[]; omittedSceneIds: string[] };
+    return { context: ContextSchema.parse(value.context), continuation: value.continuation, omittedSceneIds: value.omittedSceneIds };
+  }) : [];
   return {
     ...revision, blocks: blocks(revision.content),
+    storyCandidate: new StoryStore(book).candidate(id),
+    writerContexts,
     review: review ? { ...review, payload: review.status === 'reviewed' ? ReviewSchema.parse(JSON.parse(review.payload)) : null } : null,
     extraction: extraction ? { ...extraction, payload: extraction.status === 'extracted' ? ExtractionSchema.parse(JSON.parse(extraction.payload)) : null } : null,
   };
@@ -93,9 +106,9 @@ export function workspaceView(book: BookStore) {
       eligible: entry.kind === 'fact' && entry.status === 'fresh' && snapshot.state.confirmedFactIds.includes(entry.id),
     }));
     return {
-      project: book.project(), snapshot,
+      project: book.project(), snapshot, story: new StoryStore(book).view(snapshot.version),
       proposals: proposals.map(proposal => ({ ...proposal, approval: approvalState(book, proposal), stale: proposal.baseVersion !== snapshot.version })),
-      runs, memory,
+      runs, memory, memoryJobs: new MemoryJobStore(book).list(),
       memorySources: book.db.prepare('SELECT revision_id AS revisionId, content_hash AS contentHash, status FROM memory_sources').all() as { revisionId: string; contentHash: string; status: string }[],
       versions: book.db.prepare('SELECT version, created_at AS createdAt FROM snapshots ORDER BY version DESC').all() as { version: number; createdAt: string }[],
       patches: proposals.filter(item => item.kind === 'patch').map(item => ({ ...item, payload: PatchPayloadSchema.parse(item.payload) })),
@@ -114,6 +127,7 @@ export function configurationView(loaded: LoadedConfig) {
     credentialAvailable, hasFakeResponses: model.provider === 'fake' && Boolean(model.responsesFile), prices: model.prices ?? null,
     maxOutputTokens: model.maxOutputTokens, contextWindowTokens: model.contextWindowTokens,
     nodeVersion: process.versions.node, offlineOk: isSupportedNode(process.versions.node),
+    memoryService: hindsightStatus,
   };
 }
 export type WorkspaceView = ReturnType<typeof workspaceView>;

@@ -34,6 +34,10 @@ npm run web -- --library ./books
 
 故事记忆按事实、角色误信、未来计划和摘要分组，可筛选人物与来源、确认或纠正信息、维护别名与作者约束，并重建缺少或失效的记忆。上下文预览读取指定已批准计划的实际来源清单，不将“有效且已确认”直接当作“本章已采用”；作者纠正的旧条目保留追溯入口，历史和失效条目不参与有效上下文。
 
+在故事记忆的“场景与认知”页签启用小说专用记忆后，可通过表单维护稳定人物身份、故事事件与先后关系、场景视角、断言归属、人物获知时机、读者披露、伏笔和写作规则。旧章的时间与视角保持未知，需明确设置后用于场景写作。误信、台词、传闻、梦境和推测与世界事实分开，作者确认不改变种类。
+
+规划页可以逐场景编辑目标、故事位置和允许披露的命题；写作按场景顺序执行，共享原任务预算，最后审查实际整章正文。章节页的“上下文”显示该候选实际保存的场景输入，“记忆变更”提供章级来源预览。先批准正文，再采纳记忆变更，最后确认有效断言；正文批准不自动确认记忆。改稿页显示直接关联的记忆来源，任务页显示持久化同步队列。
+
 局部改稿先分析实际检查范围，再按组选择并预览正文差异。依赖组需要明确选入，触碰锁定时禁止生成所选候选；实际选中的每章均须重新审稿，最后在完整方案页一次批准。正式稿段落可通过正文旁的锁定按钮保护或解锁。撤回创建新版本，相关章节有后续改动时拒绝自动覆盖。
 
 版本与导出可查看固定项目快照、按选定版本下载 Markdown／TXT、预览并恢复同章历史正文，也可在当前版本调整章节顺序。导出只包含选定快照的正式稿；历史查看、当前作品和恢复后的新版本分别标明。
@@ -118,6 +122,8 @@ npm run novel -- --project ./books/demo proposal reject <proposal-id>
 
 全局 `--project` 与 `--config` 放在子命令前。计划编辑文件包含 title、goal、characters、constraints、events 和 targetLength；编辑产生新的提案 ID，原提案标记为 superseded。每批规划支持 1～20 章。
 
+计划可包含 1～12 个 `scenes`，字段见 [ScenePlanSchema](src/domain/planning.ts)。启用故事记忆的作品使用场景规划协议；已保存的旧运行继续沿用旧协议。叙述方式支持有限视角、全知和不可靠叙述；人物用名称或稳定 ID 指定，同名时需要明确身份。
+
 Writer 只使用已批准的计划和正式正文；候选与拒绝稿不会进入导出或后续上下文。dry-run 只读取固定来源，不创建运行或调用模型。每部作品同时只允许一个模型写任务；运行检查输入版本与写入权，旧进程的迟到响应不能保存为新候选。请求数默认上限为 8，运行 token 预算默认 64000，可用 `--max-requests` 与 `--max-tokens` 调整。
 
 ## 写作、审稿与恢复
@@ -139,6 +145,25 @@ resume 复用保存的步骤和产物，输入版本改变时拒绝继续；unkn
 
 ## 记忆、来源与上下文
 
+`story show [--version <version>]` 查看版本化的事件、场景、断言、认知、披露和伏笔；`story save --file <file> --expected-version <version>` 保存完整故事状态，`story set <collection> --file <file> --expected-version <version>` 新增或编辑单条，`story confirm <ids...> --expected-version <version>` 确认有效断言。确认误信不会把它变为事实。旧作品的场景保持未知时间和叙述方式，首次显式保存后才启用新故事状态。
+
+```bash
+npm run novel -- --project ./books/demo story context <scene-id>
+npm run novel -- --project ./books/demo story context <scene-id> --task reviewer --version <version>
+npm run novel -- --project ./books/demo story candidate <revision-id>
+npm run novel -- --project ./books/demo story apply <revision-id> --expected-version <version>
+npm run novel -- --project ./books/demo story correct <claim-id> --file ./corrected-claim.json --expected-version <version>
+npm run novel -- story service-status
+```
+
+新场景上下文优先保存作者与本章硬约束、场景安全指令、必要人物状态和到期伏笔，再按人物、别名及本地预算选择其他信息。只有来源有效、作者已确认、时间适用且符合人物知情和读者披露的信息可以进入 Writer。明确安排在本场景揭示的事实标为“本场景获知”，不能写成此前已知。未知时间不从章号推断，读者已知不等于人物知道。
+
+未标注可见范围的整章与旧摘要默认省略；允许的原文引用仍核对修订、哈希、区块与范围。硬约束混有当前不可用内容或超过预算时明确失败。Reviewer 使用独立的全局视图，其原始反馈不直接交给场景 Writer。已知文本的字面检查不等于开放正文的语义无泄露保证。
+
+采纳记忆变更只接受仍为当前正式稿的来源。纠正保留原条目和来源，重建不复活已被纠正的结论。正文、失效状态和同步队列在一个事务内提交；外部索引不参与该事务。当前产品使用本地读取路径，Hindsight 产品入口关闭，准入状态可离线查询；接口和诊断说明见 [Hindsight 准入记录](docs/implementation/hindsight-admission.md)。
+
+可写打开旧数据库时，程序先将完整升级前数据库保存在作品的 `backups/novel-schema-<version>-<id>.db`，通过 SQLite 完整性与版本检查后再事务迁移。历史快照和不可变正文不重写；备份需要由作者保留。恢复时先停止工作台，在独立目录复制该备份为 `novel.db`，用匹配版本的程序核对导出，避免覆盖正在使用的工作区。
+
 ```bash
 npm run novel -- --project ./books/demo memory status
 npm run novel -- --project ./books/demo memory confirm <fact-id> <fact-id>
@@ -151,9 +176,9 @@ npm run novel -- --project ./books/demo constraints set --file ./constraints.jso
 
 事实默认未确认。确认候选事实不会改变项目基线，候选批准时同时提升为正式来源；确认或纠正正式稿事实会产生新的项目版本，已有候选可能因此过期。纠正保留旧条目、来源和作者决定。constraints 文件是作者独立声明的字符串数组。
 
-新增章节保留来源未变的旧章记忆，只重建新增或失效来源；替换旧正文、重排或改变作者约束会在正文事务里使旧派生记忆失效。失效摘要和事实不参与上下文，预算允许时回退正式原文。rebuild 涉及模型请求，默认最多 16 次请求、128000 token，可单独指定 `--chapter <id>`。
+新增章节保留来源未变的旧章记忆，只重建新增或失效来源；替换正文使该来源与明确的下游依赖失效。重排、作者约束变化及依赖不完整的情况保守处理。失效摘要和事实不参与上下文；新场景模式只回退符合可见范围的已定位原文片段。rebuild 涉及模型请求，默认最多 16 次请求、128000 token，可单独指定 `--chapter <id>`；故事记忆重建保存章级候选，仍需作者采纳。
 
-上下文保留硬约束和当前计划，优先最近正式正文，再按人物、别名和关键词选择已确认事实及旧章来源；每项来源记录版本、选择理由和估算，省略项也记录原因。事实、角色误信、未来计划分别分组。计划可设置 viewpointCharacter；仅有明确角色和获知时间证据的信息进入该视角的已知组，缺少证据保留未知。章序只用于叙述披露范围，不推断故事发生时间。单值关系在同一明确时间出现多个值时显示待核对冲突，多件物品会并存。
+未启用故事状态的旧作品保持章级协议：上下文保留硬约束和当前计划，优先最近正式正文，再按人物、别名和关键词选择已确认事实及旧章来源。来源记录版本、选择理由和估算，省略项记录原因。旧协议的知情分组只要求角色和时间字符串，新场景模式才使用可比较的事件关系；新规则不会重新解释旧运行输入。
 
 ## 局部修订、锁定与撤回
 
@@ -180,11 +205,15 @@ undo 通过创建新正文版本恢复选择前的内容；若相关章节已有
 npm run novel -- --project ./books/demo run replay <run-id> --offline
 npm run novel -- evaluation status
 npm run novel -- evaluation compare --file ./measurements.json
+npm run novel -- evaluation story-status
+npm run novel -- evaluation story-compare --file ./memory-measurements.json
 ```
 
 replay 在 SQLite 只读事务中重新核对请求输入摘要、原始响应解析、引用和部分选择的实际正文，不重发模型请求，也不修改正式稿。返回 originalStatus、逐项检查、未确认请求和 databaseChanges；重放核对成功不代表原运行成功或创作质量通过。存在 unknown 或校验失败时退出码为 1。
 
 效果比较输入遵循 [EvaluationSchema](src/application/evaluation.ts)。每条记录包含组别、任务与重复次数、模型／来源／参数标识、人工编辑时间、总耗时、标注问题的真阳性／误报／漏报、未批准锁定修改数和费用。两组任务必须成对、同模型和同资料，每个任务至少三次独立运行；比较中位修稿时间、召回、误报和费用。合成数据、未获人工确认的标签、未冻结协议及不完整费用都不能产生通过结论。
+
+记忆对照使用独立的 [StoryEvaluationSchema](src/application/story-evaluation.ts)，比较相同领域规则下的本地读取与 Hindsight。记录参考和选中来源、引用有效率、旧版本与跨作品误用、未允许披露的输入、正文提前揭示、修稿时间和完整内部费用；每组每任务至少 3 次，留出集单独汇总。该入口保留原评测协议，并拒绝用工程合成材料或未冻结阈值产生效果通过结论。
 
 ## 模型契约与离线响应
 
@@ -218,5 +247,7 @@ node dist/cli/main.js doctor --offline --json
 - [UI 工作台设计](docs/design/workbench.md)：基于当前核心的功能方案、接口边界和八张概念图。
 - [工作台执行计划](docs/implementation/workbench-plan.md)：分步实施范围、检查入口与验收标准。
 - [工作台验收记录](docs/implementation/workbench-acceptance.md)：实际页面截图、离线流程、分步提交与验收限制。
+- [小说记忆执行计划](docs/implementation/story-memory-plan.md)：N1～N8 的实施顺序与边界。
+- [小说记忆验收记录](docs/implementation/story-memory-acceptance.md)：工程结果、真实服务与人工效果的区分。
 
-工程为私有本地项目，`package.json` 设置了 `private: true` 和 `UNLICENSED`。
+本项目用于本地运行，`package.json` 的 `private: true` 用于阻止误发布到 npm；许可声明为 `UNLICENSED`。

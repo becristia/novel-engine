@@ -6,8 +6,9 @@ import { Badge, Banner, Button, Dialog, Empty, Field, PageHeader, Panel, TagsInp
 import { modelReady } from '../model.js';
 import type { PageProps } from '../model.js';
 import { useUnsavedChanges } from '../hooks.js';
+import { ScenePlanEditor } from '../story-plan.js';
 
-const toForm = (plan: ApprovedPlan) => ({ title: plan.title, goal: plan.goal, characters: plan.characters.join('，'), constraints: plan.constraints.join('\n'), events: plan.events.join('\n'), targetLength: String(plan.targetLength), viewpointCharacter: plan.viewpointCharacter ?? '' });
+const toForm = (plan: ApprovedPlan) => ({ title: plan.title, goal: plan.goal, characters: plan.characters.join('，'), constraints: plan.constraints.join('\n'), events: plan.events.join('\n'), targetLength: String(plan.targetLength), viewpointCharacter: plan.viewpointCharacter ?? '', scenes: plan.scenes ?? [] });
 const lines = (value: string) => value.split('\n').map(item => item.trim()).filter(Boolean);
 export function PlanningPage(props: PageProps) {
   const { data, config, busy, action, job, notify, navigate } = props;
@@ -29,12 +30,12 @@ export function PlanningPage(props: PageProps) {
   const run = batch ? data.runs.find(item => item.id === batch.runId) : undefined;
   const submitPlan = async () => {
     if (!batch || !plan || !form) return;
-    const value = PlanContentSchema.safeParse({ title: form.title.trim(), goal: form.goal.trim(), characters: form.characters.split(/[，,\n]/u).map(v => v.trim()).filter(Boolean), constraints: lines(form.constraints), events: lines(form.events), targetLength: Number(form.targetLength), viewpointCharacter: form.viewpointCharacter.trim() || null });
+    const value = PlanContentSchema.safeParse({ title: form.title.trim(), goal: form.goal.trim(), characters: form.characters.split(/[，,\n]/u).map(v => v.trim()).filter(Boolean), constraints: lines(form.constraints), events: lines(form.events), targetLength: Number(form.targetLength), viewpointCharacter: form.viewpointCharacter.trim() || null, ...(form.scenes.length ? { scenes: form.scenes } : {}) });
     if (!value.success) { notify('请填写标题、目标和有效的目标字数。', true); return; }
     const result = await action<Proposal>({ action: 'edit-plan', proposalId: batch.id, chapter: plan.ordinal, plan: value.data });
     setSelected(result.id); notify('计划修改已保存为新提案。');
   };
-  const field = (key: keyof NonNullable<typeof form>, value: string) => setForm(current => current ? { ...current, [key]: value } : null);
+  const field = (key: Exclude<keyof NonNullable<typeof form>, 'scenes'>, value: string) => setForm(current => current ? { ...current, [key]: value } : null);
   const generator = <form onSubmit={event => { event.preventDefault(); void job({ kind: 'plan', brief, chapters: Number(count) }).then(() => { setGenerate(false); notify('规划任务已启动，可在任务记录中查看进度。'); }).catch(() => undefined); }}>
     <Field label="创作要求"><textarea required value={brief} onChange={event => setBrief(event.target.value)} placeholder="这几章需要推进什么情节？有哪些人物、约束和期待的转折？" rows={5}/></Field>
     <Field label="本批章节数" hint="每批支持 1～20 章。"><input type="number" min={1} max={20} required value={count} onChange={event => setCount(event.target.value)}/></Field>
@@ -56,6 +57,7 @@ export function PlanningPage(props: PageProps) {
           <Field label="出场人物"><TagsInput disabled={!editable} value={form.characters.split(/[，,\n]/u).map(v => v.trim()).filter(Boolean)} onChange={value => field('characters', value.join('，'))}/></Field>
           <Field label="关键事件" hint="每行一个事件。"><textarea disabled={!editable} value={form.events} onChange={e => field('events', e.target.value)} rows={3}/></Field>
           <Field label="本章约束"><textarea disabled={!editable} value={form.constraints} onChange={e => field('constraints', e.target.value)}/></Field>
+          <ScenePlanEditor scenes={form.scenes} onChange={scenes => setForm({ ...form, scenes })} story={data.story.story} disabled={!editable}/>
         </Panel>
         <Panel className="author-constraints"><div className="section-heading"><h2>作者约束</h2><Badge tone="amber">来自作品约束</Badge></div><div className="stack">{data.snapshot.state.constraints.length ? data.snapshot.state.constraints.map((constraint, index) => <div className="constraint-card" key={index}><span className="number-disc">{index + 1}</span><p>{constraint}</p></div>) : <p className="muted">暂无独立约束。</p>}</div><div className="divider"/><h3>使用范围</h3><Banner>章节计划是未来安排，不能当作已发生事实。</Banner></Panel>
       </div>

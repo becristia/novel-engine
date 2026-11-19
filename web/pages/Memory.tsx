@@ -10,11 +10,13 @@ import { ContextList, SourceDialog } from '../reading.js';
 import { modelReady, workspacePath } from '../model.js';
 import type { PageProps, RevisionView, WorkspaceView } from '../model.js';
 import { useResource, useUnsavedChanges } from '../hooks.js';
+import { StoryMemoryPanel } from '../story-memory.js';
 
 type Fact = z.infer<typeof FactSchema>;
 type Entry = WorkspaceView['memory'][number];
 const relations: Record<Fact['relation'], string> = { location: '位于', possession: '持有', identity: '身份为', knowledge: '知道', event: '相关事件：', foreshadow: '相关伏笔：' };
 const kinds = { fact: '已发生事实', belief: '角色误信', plan: '未来计划' };
+const memoryTabs = [{ value: 'story', label: '场景与认知' }, { value: 'fact', label: '事实' }, { value: 'belief', label: '角色误信' }, { value: 'plan', label: '未来计划' }, { value: 'summary', label: '章节摘要' }];
 const entryText = (entry: Entry) => entry.fact ? `${entry.fact.subject}${relations[entry.fact.relation]}${entry.fact.value}` : entry.summary?.summary ?? '章节摘要';
 export function MemoryPage({ data, config, busy, action, job, notify, budget }: PageProps) {
   const [tab, setTab] = useState('fact'); const [person, setPerson] = useState('all'); const [query, setQuery] = useState(''); const [stateFilter, setStateFilter] = useState('all');
@@ -52,9 +54,10 @@ export function MemoryPage({ data, config, busy, action, job, notify, budget }: 
   const canModel = modelReady(config) && !busy && !data.runs.some(run => run.active) && data.snapshot.state.chapters.length > 0;
   const rebuild = () => job({ kind: 'memory' }).then(result => notify(result.runId ? '记忆重建已启动，完成后自动刷新。' : '当前正式来源已是最新，无需重建。'));
   const closeDialog = () => { if (!dirty || window.confirm('有未保存的信息，确定放弃这次编辑吗？')) { setCorrection(null); setEditor(null); } };
+  if (tab === 'story') return <><PageHeader title="故事记忆"/><Tabs items={memoryTabs} value={tab} onChange={setTab}/><StoryMemoryPanel data={data} busy={busy} action={action} notify={notify}/></>;
   return <>
     <PageHeader title="故事记忆"/>
-    <Tabs items={[{ value: 'fact', label: '事实' }, { value: 'belief', label: '角色误信' }, { value: 'plan', label: '未来计划' }, { value: 'summary', label: '章节摘要' }]} value={tab} onChange={value => { setTab(value); setSelected(''); }}/>
+    <Tabs items={memoryTabs} value={tab} onChange={value => { setTab(value); setSelected(''); }}/>
     <div className="memory-layout">
       <Panel title="人物" className="people-panel"><button className={person === 'all' ? 'selected' : ''} onClick={() => setPerson('all')}>全部人物</button>{people.map(name => <button key={name} className={person === name ? 'selected' : ''} onClick={() => setPerson(name)}>{name}</button>)}<div className="divider"/><p className="help-text">{person === 'all' ? '选择人物查看相关信息。' : `别名：${data.snapshot.state.aliases[person]?.join('、') || '未设置'}`}</p>
         <Button variant="ghost" icon="edit" onClick={() => { const entity = person === 'all' ? people[0] ?? '' : person; const text = (data.snapshot.state.aliases[entity] ?? []).join('，'); setEditor({ kind: 'aliases', entity, originalEntity: entity, text, original: text, version: data.project.version }); }}>管理别名</Button>

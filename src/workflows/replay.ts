@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { hash } from '../domain/workspace.js';
-import { PlannerOutputSchema } from '../domain/planning.js';
+import { PlannerOutputSchema, StoryPlannerOutputSchema } from '../domain/planning.js';
 import { ReviewSchema, ExtractionSchema } from '../domain/review.js';
 import { ImpactSchema, SelectionSchema, PatchPayloadSchema } from '../domain/patch.js';
 import { ContextSchema } from '../context/builder.js';
@@ -10,14 +10,17 @@ import { ProposalStore } from '../storage/proposal-store.js';
 import { SummarySchema } from '../storage/memory-store.js';
 import { resolveReference, validateReview, validateExtraction } from '../review/evidence.js';
 import { normalizeImpact, previewGroups } from '../proposals/patches.js';
+import { contextRevisionIds } from '../context/story-builder.js';
+import { validateStoryChanges } from '../review/story-extraction.js';
 
 export function replayRun(directory: string, id: string) {
   const book = new BookStore(directory, false, true);
   try {
     return book.db.transaction(() => {
     const runs = new RunStore(book); const run = runs.get(id); const attempts = runs.attempts(id);
-    const input = run.input as { context?: unknown; revisionIds?: string[] };
+    const input = run.input as { context?: unknown; reviewContext?: unknown; revisionIds?: string[] };
     const context = input.context === undefined ? undefined : ContextSchema.parse(input.context);
+    const reviewContext = input.reviewContext === undefined ? context : ContextSchema.parse(input.reviewContext);
     const checks: { target: string; ok: boolean; result: string }[] = [];
     if (context) {
       checks.push({ target: 'input-snapshot', ok: context.projectVersion === run.baseVersion, result: '记录上下文的项目版本与运行基线比较' });
@@ -34,14 +37,17 @@ export function replayRun(directory: string, id: string) {
       try {
         if (attempt.finishReason === 'length' || attempt.finishReason === 'content-filter') throw new Error('incomplete-output');
         if (attempt.step === 'plan:v1') PlannerOutputSchema.parse(JSON.parse(attempt.raw));
+        else if (attempt.step === 'plan:story-v1') StoryPlannerOutputSchema.parse(JSON.parse(attempt.raw));
         else if (attempt.step === 'probe:v1') z.strictObject({ ok: z.literal(true) }).parse(JSON.parse(attempt.raw));
         else if (attempt.step.startsWith('review:')) {
           const revisionId = attempt.step.slice('review:'.length);
-          const allowed = new Set([...(context?.sources.filter(source => !['constraint', 'plan'].includes(source.kind)).map(source => source.revisionId) ?? []), revisionId]);
+          const allowed = new Set([...(reviewContext ? contextRevisionIds(reviewContext) : []), revisionId]);
           validateReview(book, ReviewSchema.parse(JSON.parse(attempt.raw)), allowed);
         } else if (attempt.step.startsWith('extract:') || attempt.step.startsWith('memory-facts:')) {
           const revisionId = attempt.step.slice(attempt.step.indexOf(':') + 1);
-          validateExtraction(book, ExtractionSchema.parse(JSON.parse(attempt.raw)), revisionId);
+          const extraction = ExtractionSchema.parse(JSON.parse(attempt.raw));
+          validateExtraction(book, { facts: extraction.facts }, revisionId);
+          if (extraction.story) validateStoryChanges(book, extraction.story, revisionId, run.baseVersion);
         } else if (attempt.step.startsWith('memory-summary:')) {
           const revisionId = attempt.step.slice('memory-summary:'.length); const summary = SummarySchema.parse(JSON.parse(attempt.raw));
           summary.evidence.forEach(reference => resolveReference(book, reference, new Set([revisionId])));

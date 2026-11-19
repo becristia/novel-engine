@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { PlannerOutputSchema, DraftPayloadSchema } from '../domain/planning.js';
-import { ReviewSchema, ExtractionSchema } from '../domain/review.js';
+import { PlannerOutputSchema, StoryPlannerOutputSchema, DraftPayloadSchema } from '../domain/planning.js';
+import { ReviewSchema, ExtractionSchema, StoryChangesSchema } from '../domain/review.js';
 import type { Review } from '../domain/review.js';
 import { SelectionSchema } from '../domain/patch.js';
 import type { AppConfig } from '../domain/model-config.js';
@@ -20,12 +20,15 @@ import { TrackedGateway } from '../llm/tracked-gateway.js';
 import type { TextTransport } from '../llm/sdk-provider.js';
 import { withRunLease } from './lease.js';
 import type { WriteLease } from './lease.js';
+import { activeStory, buildSceneContext, contextRevisionIds, writerForbidden, writerTextAllowed } from '../context/story-builder.js';
+import { eventRelation } from '../domain/story-memory.js';
+import { hash } from '../domain/workspace.js';
 
 const ArtifactSchema = z.strictObject({ proposalId: z.string(), revisionId: z.string().optional() });
 type Artifact = z.infer<typeof ArtifactSchema>;
 const common = { configSource: z.string(), promptVersion: z.string() };
-const PlanInput = z.strictObject({ ...common, brief: z.string().min(1), chapters: z.number().int().min(1).max(20) });
-const ChapterInput = z.strictObject({ ...common, chapter: z.number().int().positive(), context: ContextSchema, originalRevisionId: z.string().optional(), instruction: z.string().optional(), autoRevise: z.boolean().default(false) });
+const PlanInput = z.strictObject({ ...common, brief: z.string().min(1), chapters: z.number().int().min(1).max(20), storyContext: z.unknown().optional() });
+const ChapterInput = z.strictObject({ ...common, chapter: z.number().int().positive(), context: ContextSchema, sceneContexts: z.array(ContextSchema).optional(), reviewContext: ContextSchema.optional(), originalRevisionId: z.string().optional(), instruction: z.string().optional(), autoRevise: z.boolean().default(false) });
 const ReviewInput = z.strictObject({ ...common, target: ArtifactSchema, context: ContextSchema });
 
 export class CreationWorkflow {
@@ -38,8 +41,10 @@ export class CreationWorkflow {
 
   async plan(brief: string, chapters: number) {
     if (!brief.trim() || !Number.isSafeInteger(chapters) || chapters < 1 || chapters > 20) throw new Error('创作要求不能为空，每批计划支持 1～20 章。');
-    const input = PlanInput.parse({ brief, chapters, configSource: this.configSource, promptVersion: 'planner-v1' });
-    return this.execute(this.runs.create('plan', input, this.config, this.budget), false);
+    const snapshot = this.book.snapshot();
+    const storyContext = snapshot.state.story ? { story: activeStory(this.book, snapshot.version), plans: snapshot.state.plans, constraints: snapshot.state.constraints, chapters: snapshot.state.chapters.map(item => ({ ...item, content: this.book.revision(item.revisionId).content })) } : undefined;
+    const input = PlanInput.parse({ brief, chapters, configSource: this.configSource, promptVersion: storyContext ? 'planner-story-v1' : 'planner-v1', ...(storyContext ? { storyContext } : {}) });
+    return this.execute(this.runs.create('plan', input, this.config, this.budget, snapshot.version), false);
   }
 
   async draft(chapter: number) { return this.startChapter('draft', chapter); }
@@ -59,8 +64,10 @@ export class CreationWorkflow {
     const target = this.findCandidate(revisionId);
     const revision = this.book.revision(revisionId);
     const proposal = this.proposals.get(target.proposalId);
-    const context = proposal.kind === 'selection' ? selectionContext(this.book, proposal, revisionId) : buildContext(this.book, revision.chapterId, this.config);
-    const input = ReviewInput.parse({ target, context, configSource: this.configSource, promptVersion: 'reviewer-v1' });
+    const story = this.book.snapshot().state.story;
+    const scene = story?.scenes.find(item => item.chapterId === revision.chapterId);
+    const context: ContextSnapshot = proposal.kind === 'selection' ? selectionContext(this.book, proposal, revisionId) : scene ? buildSceneContext(this.book, scene.id, this.config, proposal.baseVersion, 'reviewer') : buildContext(this.book, revision.chapterId, this.config);
+    const input = ReviewInput.parse({ target, context, configSource: this.configSource, promptVersion: context.protocolVersion ? 'reviewer-story-v1' : 'reviewer-v1' });
     return this.execute(this.runs.create('review', input, this.config, this.budget, context.projectVersion), false);
   }
 
@@ -72,7 +79,10 @@ export class CreationWorkflow {
 
   private async startChapter(kind: 'draft' | 'write' | 'revise', chapter: number, extra: { autoRevise?: boolean; originalRevisionId?: string; instruction?: string } = {}) {
     const context = buildContext(this.book, chapter, this.config);
-    const input = ChapterInput.parse({ chapter, context, configSource: this.configSource, promptVersion: 'writer-v1', ...extra });
+    const scenes = this.book.snapshot(context.projectVersion).state.story?.scenes.filter(item => item.chapterId === context.plan.chapterId);
+    const sceneContexts = scenes?.map(scene => buildSceneContext(this.book, scene.id, this.config, context.projectVersion));
+    const reviewContext = scenes?.[0] ? buildSceneContext(this.book, scenes[0].id, this.config, context.projectVersion, 'reviewer') : undefined;
+    const input = ChapterInput.parse({ chapter, context, ...(sceneContexts ? { sceneContexts, reviewContext } : {}), configSource: this.configSource, promptVersion: scenes ? 'writer-story-v1' : 'writer-v1', ...extra });
     if (this.book.snapshot().state.locks.some(lock => lock.chapterId === context.plan.chapterId)) throw new Error('本章存在锁定范围，请使用局部修改提案。');
     return this.execute(this.runs.create(kind, input, this.config, this.budget, context.projectVersion), false);
   }
@@ -99,7 +109,7 @@ export class CreationWorkflow {
         let artifact: Artifact;
         if (run.kind === 'plan') {
           const input = PlanInput.parse(run.input);
-          const result = await gateway('plan:v1').generateObject({ prompt: `${prompt('planner-v1')}\n章节数：${input.chapters}\n作者要求：${input.brief}`, maxOutputTokens: run.config.model.maxOutputTokens, schema: PlannerOutputSchema });
+          const result = await gateway(input.storyContext ? 'plan:story-v1' : 'plan:v1').generateObject({ prompt: `${prompt(input.storyContext ? 'planner-story-v1' : 'planner-v1')}\n章节数：${input.chapters}\n作者要求：${input.brief}${input.storyContext ? `\n当前故事：${JSON.stringify(input.storyContext)}` : ''}`, maxOutputTokens: run.config.model.maxOutputTokens, schema: input.storyContext ? StoryPlannerOutputSchema : PlannerOutputSchema });
           if (result.value.chapters.length !== input.chapters) throw new Error('模型计划数量不符合请求。');
           artifact = this.book.db.transaction(() => {
             lease.assert();
@@ -118,13 +128,13 @@ export class CreationWorkflow {
           await this.audit(run, artifact, input.context, lease, gateway);
         } else if (['draft', 'write', 'revise'].includes(run.kind)) {
           const input = ChapterInput.parse(run.input);
-          artifact = await this.generateCandidate(run, 'draft', input.context, lease, gateway, input.originalRevisionId, input.instruction);
+          artifact = input.sceneContexts ? await this.generateScenes(run, 'draft', input, lease, gateway) : await this.generateCandidate(run, 'draft', input.context, lease, gateway, input.originalRevisionId, input.instruction);
           if (run.kind !== 'draft') {
-            let review = await this.audit(run, artifact, input.context, lease, gateway);
+            let review = await this.audit(run, artifact, input.reviewContext ?? input.context, lease, gateway);
             if (input.autoRevise && review.issues.length) {
               const original = artifact;
-              artifact = await this.generateCandidate(run, 'revision', input.context, lease, gateway, original.revisionId, JSON.stringify(review));
-              review = await this.audit(run, artifact, input.context, lease, gateway);
+              artifact = input.sceneContexts ? await this.generateScenes(run, 'revision', { ...input, instruction: '按已批准场景重新生成，重新检查衔接与视角。' }, lease, gateway) : await this.generateCandidate(run, 'revision', input.context, lease, gateway, original.revisionId, JSON.stringify(review));
+              review = await this.audit(run, artifact, input.reviewContext ?? input.context, lease, gateway);
               this.proposals.status(original.proposalId, 'superseded');
             }
           }
@@ -136,6 +146,53 @@ export class CreationWorkflow {
         return this.render(run.id, artifact);
       } catch (error) { lease.fail('workflow-failed'); throw error; }
     }, recover);
+  }
+
+  private async generateScenes(run: Run, step: string, input: z.infer<typeof ChapterInput>, lease: WriteLease, gateway: (name: string) => TrackedGateway): Promise<Artifact> {
+    const saved = this.runs.artifact(run.id, step);
+    if (saved !== undefined) return ArtifactSchema.parse(saved);
+    const story = activeStory(this.book, run.baseVersion);
+    const contexts = input.sceneContexts!;
+    type SceneResult = { sceneId: string; runId: string; text: string; contentHash: string };
+    const results: SceneResult[] = [];
+    for (const context of contexts) {
+      const scene = story.scenes.find(item => item.id === context.sceneId)!;
+      if (input.instruction && !writerTextAllowed(input.instruction, writerForbidden(story, scene))) throw new Error('场景修订指令包含本视角不可用信息，请先编辑目标场景。');
+    }
+    for (const context of contexts) {
+      const scene = story.scenes.find(item => item.id === context.sceneId)!;
+      const key = `${step}:scene:${scene.id}`;
+      const previous = this.runs.artifact(run.id, key) as SceneResult | undefined;
+      if (previous) {
+        if (previous.runId !== run.id || previous.sceneId !== scene.id || previous.contentHash !== hash(previous.text)) throw new Error('场景候选身份或内容校验失败。');
+        results.push(previous); continue;
+      }
+      const continuation = results.filter(item => {
+        const prior = story.scenes.find(candidate => candidate.id === item.sceneId)!;
+        return prior.viewpointId === scene.viewpointId && prior.narration === scene.narration && ['before', 'equal'].includes(eventRelation(story, prior.eventId, scene.eventId)) && writerTextAllowed(item.text, writerForbidden(story, scene));
+      });
+      const inputKey = `context:${key}`;
+      // Persist the exact input once, before any external request. Recovery reads it.
+      let actual = this.runs.artifact(run.id, inputKey);
+      if (actual === undefined) {
+        const { omissions: _omissions, ...visible } = context;
+        actual = { context: visible, continuation, instruction: input.instruction ?? '', omittedSceneIds: results.filter(item => !continuation.includes(item)).map(item => item.sceneId) };
+        this.book.db.transaction(() => { lease.assert(); this.runs.saveArtifact(run.id, inputKey, actual); }).immediate();
+      }
+      const response = await gateway(key).generateText({ prompt: `${prompt('writer-story-v1')}\n${JSON.stringify(actual)}`, maxOutputTokens: run.config.model.maxOutputTokens });
+      const text = response.value.replace(/^##[^\n]*(?:\n|$)/u, '').trim();
+      if (!text) throw new Error('场景候选没有有效正文。');
+      const result = { sceneId: scene.id, runId: run.id, text, contentHash: hash(text) };
+      this.book.db.transaction(() => { lease.assert(); this.runs.saveArtifact(run.id, key, result); }).immediate(); results.push(result);
+    }
+    return this.book.db.transaction(() => {
+      lease.assert(); let content = `## ${input.context.plan.title}\n\n`;
+      const sceneRanges = results.map(item => { const start = content.length; content += `${item.text}\n\n`; return { sceneId: item.sceneId, start, end: start + item.text.length }; });
+      const parent = input.originalRevisionId ?? this.book.snapshot(run.baseVersion).state.chapters.find(item => item.id === input.context.plan.chapterId)?.revisionId ?? null;
+      const revision = this.book.insertRevision(input.context.plan.chapterId, content, parent, run.id);
+      const proposal = this.proposals.create('draft', run.baseVersion, { chapterId: revision.chapterId, revisionId: revision.id, planRevisionId: input.context.plan.revisionId, contentHash: revision.contentHash, sceneRanges }, run.id);
+      const artifact = { proposalId: proposal.id, revisionId: revision.id }; this.runs.saveArtifact(run.id, step, artifact); return artifact;
+    }).immediate();
   }
 
   private async generateCandidate(run: Run, step: string, context: ContextSnapshot, lease: WriteLease, gateway: (name: string) => TrackedGateway, originalRevisionId?: string, instruction?: string): Promise<Artifact> {
@@ -162,7 +219,7 @@ export class CreationWorkflow {
     const proposal = this.proposals.get(artifact.proposalId);
     const binding = proposal.kind === 'selection' ? SelectionSchema.parse(proposal.payload).drafts.find(draft => draft.revisionId === revision.id) : DraftPayloadSchema.parse(proposal.payload);
     if (!binding || proposal.status !== 'pending' || proposal.baseVersion !== run.baseVersion || binding.contentHash !== revision.contentHash || ('planRevisionId' in binding && binding.planRevisionId !== context.plan.revisionId)) throw new Error('候选、计划或项目版本不一致。');
-    const sourceIds = new Set([...context.sources.filter(source => !['plan', 'constraint'].includes(source.kind)).map(source => source.revisionId), revision.id]);
+    const sourceIds = new Set([...contextRevisionIds(context), revision.id]);
     const sources = [...sourceIds].map(id => { const source = this.book.revision(id); return { chapterId: source.chapterId, revisionId: id, contentHash: source.contentHash, blocks: blocks(source.content) }; });
     const reviewKey = `review:${revision.id}`;
     let review: Review;
@@ -172,7 +229,7 @@ export class CreationWorkflow {
       review = ReviewSchema.parse(JSON.parse(row.payload));
     } else {
       try {
-        const response = await gateway(reviewKey).generateObject({ prompt: `${prompt('reviewer-v1')}\n${JSON.stringify({ targetRevisionId: revision.id, context, sources })}`, maxOutputTokens: run.config.model.maxOutputTokens, schema: ReviewSchema });
+        const response = await gateway(reviewKey).generateObject({ prompt: `${prompt(context.protocolVersion ? 'reviewer-story-v1' : 'reviewer-v1')}\n${JSON.stringify({ targetRevisionId: revision.id, context, sources })}`, maxOutputTokens: run.config.model.maxOutputTokens, schema: ReviewSchema });
         review = validateReview(this.book, response.value, sourceIds);
         this.book.db.transaction(() => { lease.assert(); const id = this.reports.save('reviews', revision.id, run.baseVersion, run.id, 'reviewed', review); this.runs.saveArtifact(run.id, reviewKey, { id }); }).immediate();
       } catch (error) {
@@ -182,9 +239,11 @@ export class CreationWorkflow {
     const extractionKey = `extract:${revision.id}`;
     if (this.runs.artifact(run.id, extractionKey) === undefined) {
       try {
-        const response = await gateway(extractionKey).generateObject({ prompt: `${prompt('extractor-v1')}\n${JSON.stringify(sources.find(source => source.revisionId === revision.id))}`, maxOutputTokens: run.config.model.maxOutputTokens, schema: ExtractionSchema });
+        const story = context.protocolVersion ? this.book.snapshot(run.baseVersion).state.story : undefined;
+        const identity = story ? { entities: story.entities, events: story.events.map(item => ({ id: item.id })), scenes: story.scenes.filter(item => item.chapterId === revision.chapterId).map(item => ({ id: item.id, eventId: item.eventId })), claimIds: story.claims.map(item => item.id) } : undefined;
+        const response = await gateway(extractionKey).generateObject({ prompt: `${prompt(story ? 'extractor-story-v1' : 'extractor-v1')}\n${JSON.stringify({ ...sources.find(source => source.revisionId === revision.id), ...(identity ? { identities: identity } : {}) })}`, maxOutputTokens: run.config.model.maxOutputTokens, schema: story ? ExtractionSchema.extend({ story: StoryChangesSchema }) : ExtractionSchema });
         const extraction = validateExtraction(this.book, response.value, revision.id);
-        this.book.db.transaction(() => { lease.assert(); const id = this.reports.save('extractions', revision.id, run.baseVersion, run.id, 'extracted', extraction); new MemoryStore(this.book).ingest(revision.id, extraction); this.runs.saveArtifact(run.id, extractionKey, { id }); }).immediate();
+        this.book.db.transaction(() => { lease.assert(); const id = this.reports.save('extractions', revision.id, run.baseVersion, run.id, 'extracted', extraction); new MemoryStore(this.book).ingest(revision.id, extraction); if (extraction.story) this.book.db.prepare('INSERT INTO story_candidates VALUES (?, ?, ?)').run(run.id, revision.id, JSON.stringify(extraction.story)); this.runs.saveArtifact(run.id, extractionKey, { id }); }).immediate();
       } catch (error) {
         lease.assert(); this.reports.save('extractions', revision.id, run.baseVersion, run.id, 'failed', { code: 'extraction-unavailable' }); throw error;
       }

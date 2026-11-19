@@ -5,6 +5,7 @@ import { MemoryStore } from '../storage/memory-store.js';
 import { RunStore } from '../storage/run-store.js';
 import { BookStore } from '../storage/book-store.js';
 import { PatchService } from '../proposals/patches.js';
+import { StoryStore } from '../storage/story-store.js';
 
 export function workbenchAction(book: BookStore, value: unknown): unknown {
   const input = ActionSchema.parse(value);
@@ -14,6 +15,11 @@ export function workbenchAction(book: BookStore, value: unknown): unknown {
     const proposals = new ProposalService(book); const memory = new MemoryStore(book);
     const commits = new CommitService(book); const patches = new PatchService(book);
     switch (input.action) {
+      case 'story-save': return new StoryStore(book).save(input.story, input.expectedVersion);
+      case 'story-set': return new StoryStore(book).upsert(input.collection, input.value, input.expectedVersion);
+      case 'story-confirm': return new StoryStore(book).confirm(input.ids, input.expectedVersion);
+      case 'story-apply': return new StoryStore(book).applyCandidate(input.revisionId, input.expectedVersion);
+      case 'story-correct': return new StoryStore(book).correct(input.id, input.value, input.expectedVersion);
       case 'approve': return proposals.approve(input.proposalId, input.reason);
       case 'reject': proposals.reject(input.proposalId); return { rejected: true };
       case 'edit-plan': return proposals.editPlan(input.proposalId, input.chapter, input.plan);

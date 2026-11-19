@@ -25,6 +25,7 @@ export function ChaptersPage(props: PageProps) {
   const [source, setSource] = useState<Reference | null>(null);
   const [editor, setEditor] = useState<{ chapterId: string | null; title: string; content: string; original: string; version: number; preview: boolean } | null>(null);
   const [reviseOnce, setReviseOnce] = useState(false);
+  const [sceneId, setSceneId] = useState('');
   const editorDirty = Boolean(editor && (editor.content !== editor.original || (!editor.chapterId && editor.title)));
   useUnsavedChanges(editorDirty);
   useEffect(() => {
@@ -35,7 +36,10 @@ export function ChaptersPage(props: PageProps) {
   }, [chapter?.id, latest?.revisionId, focus.revisionId]);
   useEffect(() => { if (focus.createChapter) setEditor({ chapterId: null, title: '', content: '', original: '', version: data.project.version, preview: false }); }, [focus.createChapter]);
   const reader = useResource<RevisionView>(revisionId ? workspacePath(data.project.id, `revisions/${revisionId}`) : null, `${data.project.version}:${data.runs.filter(run => run.status === 'running').length}:${data.runs.filter(run => run.status === 'succeeded' || run.status === 'awaiting_approval').length}`);
-  const context = useResource<ContextSnapshot>(pane === 'context' && chapter?.plan ? workspacePath(data.project.id, `context?chapter=${chapter.plan.ordinal}`) : null, data.project.version);
+  const actualContexts = reader.value?.writerContexts ?? [];
+  const actual = actualContexts.find(item => item.context.sceneId === sceneId) ?? actualContexts[0];
+  const chapterScenes = data.story.story.scenes.filter(scene => scene.chapterId === chapter?.id);
+  const context = useResource<ContextSnapshot>(pane === 'context' && chapter?.plan && !actualContexts.length ? workspacePath(data.project.id, sceneId && chapterScenes.some(scene => scene.id === sceneId) ? `context?scene=${encodeURIComponent(sceneId)}` : `context?chapter=${chapter.plan.ordinal}`) : null, data.project.version);
   const report = reader.value?.review;
   const issues = [...(report?.payload?.issues ?? [])].sort((a, b) => ['conflict', 'uncertain', 'style'].indexOf(a.kind) - ['conflict', 'uncertain', 'style'].indexOf(b.kind));
   const issue = issues.find(item => item.id === issueId) ?? issues[0];
@@ -78,7 +82,7 @@ export function ChaptersPage(props: PageProps) {
         </div>
       </div>
       <aside className="inspector">
-        <Tabs items={[{ value: 'review', label: '审稿' }, { value: 'plan', label: '本章计划' }, { value: 'context', label: '上下文' }]} value={pane} onChange={setPane}/>
+        <Tabs items={[{ value: 'review', label: '审稿' }, { value: 'plan', label: '本章计划' }, { value: 'context', label: '上下文' }, ...(data.story.enabled ? [{ value: 'memory', label: '记忆变更' }] : [])]} value={pane} onChange={setPane}/>
         <div className="inspector-body">
           {pane === 'review' && <>
             <h2>审稿结果</h2>
@@ -99,7 +103,8 @@ export function ChaptersPage(props: PageProps) {
             </details>
           </>}
           {pane === 'plan' && (chapter.plan ? <div className="stack"><h2>{chapter.plan.title}</h2><Badge tone="green">计划已批准</Badge><div><h3>本章目标</h3><p>{chapter.plan.goal}</p></div><div><h3>出场人物</h3><p>{chapter.plan.characters.join('、') || '未指定'}</p></div><div><h3>关键事件</h3>{chapter.plan.events.map((event, i) => <p key={i}>{i + 1}．{event}</p>)}</div><div><h3>本章约束</h3><p>{chapter.plan.constraints.join('；') || '暂无'}</p></div><p className="help-text">目标 {chapter.plan.targetLength.toLocaleString()} 字；视角：{chapter.plan.viewpointCharacter || '未指定'}。</p></div> : <p className="muted">导入或手工添加的章节没有模型规划记录。</p>)}
-          {pane === 'context' && (context.error ? <ErrorText error={context.error}/> : context.value ? <ContextList context={context.value}/> : <p className="muted">{chapter.plan ? '正在读取上下文…' : '需要已批准的章节计划才能预览上下文。'}</p>)}
+          {pane === 'context' && <><p className="help-text">{actual ? '本次 Writer 实际保存的输入；后续编辑不会改写这份记录。' : '当前快照的上下文预览。'}</p>{chapterScenes.length > 0 && <Field label="上下文场景"><select value={actual?.context.sceneId ?? sceneId} onChange={e => setSceneId(e.target.value)}>{chapterScenes.map(scene => <option key={scene.id} value={scene.id}>{scene.title}</option>)}</select></Field>}{actual ? <><ContextList context={actual.context}/>{actual.continuation.map(item => <details key={item.sceneId}><summary>任务内前序场景候选</summary><p className="source-text">{item.text}</p></details>)}</> : context.error ? <ErrorText error={context.error}/> : context.value ? <ContextList context={context.value}/> : <p className="muted">{chapter.plan ? '正在读取上下文…' : '需要已批准的章节计划才能预览上下文。'}</p>}</>}
+          {pane === 'memory' && <div className="stack"><h2>章级记忆变更</h2><Banner>先批准正文，再采纳这些来源变更；断言仍需另行确认。身份、知情与披露请重点核对。</Banner>{reader.value?.storyCandidate ? <>{Object.entries(reader.value.storyCandidate.changes).map(([key, items]) => <section key={key}><h3>{({ claims: '断言', events: '事件', knowledge: '人物认知', disclosures: '读者披露', threads: '伏笔' } as Record<string, string>)[key]} · {items.length}</h3>{items.map(item => <div className="source-item" key={item.id}><p>{'value' in item ? item.value : 'title' in item ? item.title : 'claimId' in item ? `命题：${item.claimId}` : ''}</p>{'kind' in item && <Badge>{({ fact: '世界事实', belief: '角色误信', plan: '未来计划', speech: '人物言语', rumor: '传闻', dream: '梦境', inference: '推测' } as Record<string, string>)[item.kind]}</Badge>}{item.source.kind === 'text' && <blockquote>{item.source.quote}</blockquote>}</div>)}</section>)}<Button variant="primary" disabled={busy || chapter.revisionId !== revisionId || !Object.entries(reader.value.storyCandidate.changes).some(([key, items]) => items.some(item => !data.story.story[key as 'claims'].some(existing => existing.id === item.id)))} onClick={() => void action({ action: 'story-apply', revisionId: revisionId! }).then(() => notify('章级记忆已采纳，断言仍待确认。')).catch(() => undefined)}>采纳本章记忆变更</Button></> : <p className="muted">本修订尚无有效的故事记忆抽取。</p>}<Button onClick={() => navigate('memory')}>前往故事记忆确认</Button></div>}
         </div>
         <footer className="step-strip"><span><Icon name={revisionId ? 'check' : 'clock'} size={18}/>{revisionId ? '正文已保存' : '等待生成'}</span><span>→</span><span><Icon name={report?.payload ? 'check' : 'clock'} size={18}/>{report?.payload ? '审稿完成' : '等待审稿'}</span><span>→</span><span>{mode === 'official' ? '正式稿' : '作者处理'}</span></footer>
       </aside>

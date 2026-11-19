@@ -11,6 +11,7 @@ import { normalizeImpact } from '../proposals/patches.js';
 import { blocks } from '../review/evidence.js';
 import { prompt } from '../agents/prompts.js';
 import { withRunLease } from './lease.js';
+import { activeStory } from '../context/story-builder.js';
 
 const InputSchema = z.strictObject({ sourceChapterId: z.string(), instruction: z.string().min(1), revisionIds: z.array(z.string()), omittedChapterIds: z.array(z.string()), configSource: z.string(), promptVersion: z.literal('impact-v1'), parentId: z.string().nullable() });
 export class ImpactWorkflow {
@@ -43,7 +44,8 @@ export class ImpactWorkflow {
         if (existing) return { runId: id, proposal: this.proposals.get(existing.proposalId) };
         const sources = input.revisionIds.map(revisionId => { const revision = this.book.revision(revisionId); return { chapterId: revision.chapterId, revisionId, contentHash: revision.contentHash, blocks: blocks(revision.content) }; });
         const gateway = new TrackedGateway(this.runs, id, 'impact:v1', this.transport, retryUnknown, lease.assert);
-        const result = await gateway.generateObject({ prompt: `${prompt('impact-v1')}\n${JSON.stringify({ instruction: input.instruction, sources, constraints: this.book.snapshot(run.baseVersion).state.constraints })}`, maxOutputTokens: run.config.model.maxOutputTokens, schema: ImpactSchema });
+        const state = this.book.snapshot(run.baseVersion).state;
+        const result = await gateway.generateObject({ prompt: `${prompt('impact-v1')}\n${JSON.stringify({ instruction: input.instruction, sources, constraints: state.constraints, ...(state.story ? { story: activeStory(this.book, run.baseVersion) } : {}) })}`, maxOutputTokens: run.config.model.maxOutputTokens, schema: ImpactSchema });
         const output = normalizeImpact(this.book, result.value, new Set(input.revisionIds));
         return this.book.db.transaction(() => {
           lease.assert();

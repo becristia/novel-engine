@@ -11,6 +11,7 @@ const kindLabels: Record<string, string> = { plan: '章节规划', write: '生�
 const statusLabels = { queued: '准备执行', running: '执行中', awaiting_approval: '等待批准', succeeded: '已完成', failed: '运行中断', cancelled: '已取消', stale: '输入已过期' };
 const attemptLabels = { inflight: '等待结果', received: '已保存，待校验', succeeded: '已完成', failed: '失败', unknown: '结果未知' };
 function stepName(step: string): string {
+  if (step.includes(':scene:')) return `${step.startsWith('revision:') ? '修订' : '生成'}场景 ${step.split(':scene:')[1]}`;
   if (step.startsWith('memory-summary:')) return '重建摘要'; if (step.startsWith('memory-facts:')) return '提取信息';
   const key = step.split(':')[0]!; return { plan: '章节规划', draft: '生成候选', revision: '修订候选', review: '审稿', extract: '提取信息', probe: '模型探测', impact: '影响分析' }[key] ?? '模型步骤';
 }
@@ -45,6 +46,7 @@ export function RunsPage({ data, busy, focus, navigate, action, job, perform, no
   const needsApproval = Boolean(run && ['write', 'draft', 'revise', 'plan', 'selection', 'impact'].includes(run.kind));
   return <>
     <PageHeader title="任务记录" subtitle="查看进度、已保存结果与下一步。"/>
+    {data.story.enabled && <details className="panel story-sync"><summary>记忆同步队列 · {data.memoryJobs.filter(item => item.status === 'pending').length} 项待同步</summary><p className="help-text">本地正文和失效状态已经保存。外部检索服务通过准入前，任务保留在队列中。</p>{data.memoryJobs.map(item => <p key={item.id}><Badge>{({ pending: '待同步', inflight: '处理中', unknown: '结果未知，先查询', failed: '已失败', succeeded: '已同步', obsolete: '旧来源，不再采用' } as Record<string, string>)[item.status]}</Badge> 来源 {item.sourceId.slice(0, 8)} · 尝试 {item.attempts} 次{item.externalId ? ' · 已保存外部操作身份' : ''}</p>)}</details>}
     <div className="filter-tabs"><Tabs items={[{ value: 'all', label: '全部' }, { value: 'running', label: '进行中' }, { value: 'pending', label: '待处理' }, { value: 'ended', label: '已结束' }]} value={filter} onChange={setFilter}/></div>
     <div className="runs-layout">
       <Panel className="run-list"><div className="search-box"><Icon name="search"/><input aria-label="搜索章节或任务" placeholder="搜索章节或任务" value={search} onChange={e => setSearch(e.target.value)}/></div>

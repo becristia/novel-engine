@@ -1,5 +1,6 @@
 import type { Reference, Review, Extraction } from '../domain/review.js';
 import { BookStore } from '../storage/book-store.js';
+import { validateStoryChanges } from './story-extraction.js';
 
 export function blocks(content: string) {
   return [...content.matchAll(/[^\n]+/gu)].filter(match => match[0].trim()).map((match, index) => ({ id: `b${index + 1}`, start: match.index, end: match.index + match[0].length, text: match[0] }));
@@ -30,7 +31,7 @@ export function validateReview(book: BookStore, report: Review, allowed: Readonl
 
 export function validateExtraction(book: BookStore, report: Extraction, revisionId: string): Extraction {
   const allowed = new Set([revisionId]);
-  return { facts: report.facts.map(fact => {
+  return { ...(report.story ? { story: validateStoryChanges(book, report.story, revisionId, book.project().version) } : {}), facts: report.facts.map(fact => {
     if (fact.kind === 'belief' && !fact.characterId) throw new Error('角色误信必须指明角色。');
     return { ...fact, evidence: resolveReference(book, fact.evidence, allowed) };
   }) };

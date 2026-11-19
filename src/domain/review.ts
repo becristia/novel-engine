@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { StoryEventSchema, StoryClaimSchema, StoryKnowledgeSchema, StoryDisclosureSchema, StoryThreadSchema } from './story-memory.js';
 
 export const ReferenceSchema = z.strictObject({
   chapterId: z.string(), revisionId: z.string(), blockId: z.string(), quote: z.string().min(1),
@@ -18,5 +19,7 @@ export const FactSchema = z.strictObject({
   kind: z.enum(['fact', 'belief', 'plan']), characterId: z.string().nullable(), storyTime: z.string().nullable(), knowledgeTime: z.string().nullable(),
   evidence: ReferenceSchema,
 });
-export const ExtractionSchema = z.strictObject({ facts: z.array(FactSchema) });
+export const StoryChangesSchema = z.strictObject({ events: z.array(StoryEventSchema), claims: z.array(StoryClaimSchema), knowledge: z.array(StoryKnowledgeSchema), disclosures: z.array(StoryDisclosureSchema), threads: z.array(StoryThreadSchema) });
+export type StoryChanges = z.infer<typeof StoryChangesSchema>;
+export const ExtractionSchema = z.strictObject({ facts: z.array(FactSchema), story: StoryChangesSchema.optional() });
 export type Extraction = z.infer<typeof ExtractionSchema>;

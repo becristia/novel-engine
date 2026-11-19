@@ -9,6 +9,7 @@ import { registerCompletionCommands } from './completion-commands.js';
 import { registerMemoryCommands } from './memory-commands.js';
 import { registerPatchCommands } from './patch-commands.js';
 import { registerVerificationCommands } from './verification-commands.js';
+import { registerStoryCommands } from './story-commands.js';
 
 export interface CliIO {
   stdout: (text: string) => void;
@@ -65,6 +66,7 @@ export async function runCli(args: string[], io: CliIO = defaultIO): Promise<num
   registerMemoryCommands(program, io);
   registerPatchCommands(program, io);
   registerVerificationCommands(program, io);
+  registerStoryCommands(program, io);
 
   try {
     await program.parseAsync(args, { from: 'user' });

@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
@@ -31,6 +32,8 @@ const migrations = [
   `ALTER TABLE attempts ADD COLUMN response_model_id TEXT;
    ALTER TABLE attempts ADD COLUMN provider_response_id TEXT;
    ALTER TABLE attempts ADD COLUMN finish_reason TEXT;`,
+  `CREATE TABLE story_candidates (run_id TEXT NOT NULL REFERENCES runs(id), revision_id TEXT NOT NULL REFERENCES revisions(id), payload TEXT NOT NULL, PRIMARY KEY (run_id, revision_id));
+   CREATE TABLE memory_jobs (id TEXT PRIMARY KEY, base_version INTEGER NOT NULL, source_id TEXT NOT NULL, content_hash TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL, payload TEXT NOT NULL, external_id TEXT, attempts INTEGER NOT NULL DEFAULT 0, error TEXT, created_at TEXT NOT NULL, UNIQUE(source_id, content_hash, kind));`,
 ];
 
 export function migrateDatabase(db: Database.Database, scripts: readonly string[]): void {
@@ -64,6 +67,15 @@ export class WorkspaceDatabase {
       }
       this.db.pragma('foreign_keys = ON');
       this.db.pragma('busy_timeout = 5000');
+      if (!create && version < migrations.length) {
+        const backups = join(this.directory, 'backups'); mkdirSync(backups, { recursive: true });
+        const backup = join(backups, `novel-schema-${version}-${randomUUID()}.db`);
+        this.db.prepare('VACUUM INTO ?').run(backup);
+        const saved = new Database(backup, { readonly: true, fileMustExist: true });
+        try {
+          if (saved.pragma('quick_check', { simple: true }) !== 'ok' || saved.pragma('user_version', { simple: true }) !== version) throw new Error('数据库升级前备份校验失败。');
+        } finally { saved.close(); }
+      }
       migrateDatabase(this.db, migrations);
       this.db.pragma('journal_mode = WAL');
     } catch (error) {

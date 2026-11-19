@@ -1,0 +1,12 @@
+{
+  "version": "story-memory-v1",
+  "status": "draft",
+  "provenance": "synthetic",
+  "humanApproved": false,
+  "ruleVersion": "story-rules-v1",
+  "minimumRunsPerArm": 3,
+  "development": ["development.md"],
+  "holdout": ["holdout.md"],
+  "thresholds": null,
+  "notes": "仅为人工核对准备的工程合成材料，不是已经完成的真实长篇评测；摸底后另行冻结阈值和留出材料。"
+}

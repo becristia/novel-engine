@@ -4,13 +4,17 @@ import { z } from 'zod';
 import { ApprovedPlanSchema } from '../domain/planning.js';
 import { MemoryStore } from '../storage/memory-store.js';
 import { relevantFacts, memoryGroups } from './memory.js';
+import { StorySourceSchema, StoryTaskSchema } from '../domain/story-memory.js';
+import { buildSceneContext } from './story-builder.js';
 
 export const ContextSchema = z.strictObject({
   projectVersion: z.number().int().nonnegative(), plan: ApprovedPlanSchema,
-  sources: z.array(z.strictObject({ kind: z.enum(['constraint', 'plan', 'chapter', 'fact', 'summary']), id: z.string(), revisionId: z.string(), text: z.string(), reason: z.string(), estimatedTokens: z.number().int().nonnegative() })),
+  sources: z.array(z.strictObject({ kind: z.enum(['constraint', 'plan', 'chapter', 'fact', 'summary', 'story-claim', 'story-rule', 'story-thread', 'story-scene', 'story-state', 'text-range']), id: z.string(), revisionId: z.string(), text: z.string(), reason: z.string(), estimatedTokens: z.number().int().nonnegative(), reference: StorySourceSchema.optional() })),
   estimatedTokens: z.number().int().nonnegative(),
   omissions: z.array(z.strictObject({ id: z.string(), reason: z.string() })).optional(),
   memory: z.strictObject({ facts: z.array(z.string()), beliefs: z.array(z.string()), futurePlans: z.array(z.string()), knownByViewpoint: z.array(z.string()), knowledgeBoundary: z.string(), singleValueConflicts: z.array(z.array(z.string())), timePolicy: z.string() }).optional(),
+  protocolVersion: z.literal('story-v1').optional(), ruleVersion: z.literal('story-rules-v1').optional(),
+  task: StoryTaskSchema.optional(), sceneId: z.string().optional(),
 });
 export type ContextSnapshot = z.infer<typeof ContextSchema>;
 
@@ -21,6 +25,11 @@ export function buildContext(book: BookStore, chapter: number | string, config: 
   if (!plan) throw new Error('本章没有已批准计划。');
   const previousPlans = Object.values(snapshot.state.plans).filter(item => item.ordinal < plan.ordinal);
   if (previousPlans.some(item => !snapshot.state.chapters.some(existing => existing.id === item.chapterId))) throw new Error('前序章节尚未接受，不能越过正式稿继续生成。');
+  if (snapshot.state.story) {
+    const scene = snapshot.state.story.scenes.find(item => item.chapterId === plan.chapterId);
+    if (!scene) throw new Error('本章缺少场景计划，请先补齐场景。');
+    return buildSceneContext(book, scene.id, config, version);
+  }
   const source = (kind: ContextSource['kind'], id: string, revisionId: string, text: string, reason: string): ContextSource => ({ kind, id, revisionId, text, reason, estimatedTokens: Buffer.byteLength(text, 'utf8') });
   const sources: ContextSource[] = [
     source('constraint', 'author', String(version), JSON.stringify(snapshot.state.constraints), '作者硬约束'),

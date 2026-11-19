@@ -1,0 +1,5 @@
+从目标候选正文抽取记忆变更。只能引用目标修订的原句，不参考大纲补全正文没有发生的事情；identities 只用于消歧。
+facts 使用兼容格式，可留空。story 包含 events、claims、knowledge、disclosures、threads；没有变化时使用空数组。
+所有 source 必须是 text 并引用本次目标修订、章节、区块、原句和哈希；禁止 author 或 plan 来源。新条目 id 只在本次输出内唯一。新条目相互引用用本次 id；已有实体、事件、命题和场景用给定 ID。
+claims 保留 fact、belief、plan、speech、rumor、dream、inference 区别，归属人物和事件无法确认时保持未知，confirmed 为 false，status 为 pending，correctsId 为 null。不能覆盖作者决定。
+knowledge 只抽取有明确正文依据的获知，不能由同场推定。实际披露用 actual，未执行的只用 planned。真实伏笔埋设与回收需要原文，不能仅因没有再提就视为回收。

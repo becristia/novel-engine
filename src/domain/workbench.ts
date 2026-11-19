@@ -2,11 +2,17 @@ import { z } from 'zod';
 import { PlanContentSchema } from './planning.js';
 import { FactSchema } from './review.js';
 import { BudgetSchema } from './run.js';
+import { StoryStateSchema, storyCollections } from './story-memory.js';
 
 const id = z.string().min(1).max(256);
 const version = z.number().int().nonnegative();
 const expected = { expectedVersion: version };
 export const ActionSchema = z.discriminatedUnion('action', [
+  z.strictObject({ action: z.literal('story-save'), ...expected, story: StoryStateSchema }),
+  z.strictObject({ action: z.literal('story-set'), ...expected, collection: z.enum(storyCollections), value: z.unknown() }),
+  z.strictObject({ action: z.literal('story-confirm'), ...expected, ids: z.array(id).min(1).max(500) }),
+  z.strictObject({ action: z.literal('story-apply'), ...expected, revisionId: id }),
+  z.strictObject({ action: z.literal('story-correct'), ...expected, id, value: z.unknown() }),
   z.strictObject({ action: z.literal('approve'), ...expected, proposalId: id, reason: z.string().max(10000).default('') }),
   z.strictObject({ action: z.literal('reject'), ...expected, proposalId: id }),
   z.strictObject({ action: z.literal('edit-plan'), ...expected, proposalId: id, chapter: z.number().int().positive(), plan: PlanContentSchema }),
