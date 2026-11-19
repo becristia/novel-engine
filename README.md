@@ -2,6 +2,8 @@
 
 单用户小说创作工作台，提供规划、候选生成、审稿、人工批准和导出，支持历史快照、来源记忆、局部修订与运行恢复。工程使用 TypeScript strict、ESM、SQLite 和 AI SDK，通过 CLI 或本地 Web 界面操作。
 
+代码托管于 GitHub 公开仓库：[becristia/novel-engine](https://github.com/becristia/novel-engine) 。
+
 ## 环境与安装
 
 开发环境固定为 Node.js `24.22.1`、npm `11.19.1`，Node.js 版本记录在 `.node-version`，依赖精确版本记录在 `package-lock.json`。项目接受 Node.js `>=24.22.1 <25` 和 npm `>=11 <12`。
